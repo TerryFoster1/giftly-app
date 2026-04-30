@@ -1,0 +1,200 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String     @id
+  email        String     @unique
+  name         String
+  passwordHash String
+  sessions     Session[]
+  ownedProfiles Profile[] @relation("ProfileOwner")
+  linkedProfiles Profile[] @relation("LinkedProfile")
+  gifts        GiftItem[] @relation("GiftCreator")
+  requestedConnections Connection[] @relation("ConnectionRequester")
+  targetedConnections Connection[] @relation("ConnectionTarget")
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model Session {
+  id        String   @id
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Profile {
+  id          String     @id
+  ownerUserId String
+  owner       User       @relation("ProfileOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  linkedUserId String?
+  linkedUser   User?      @relation("LinkedProfile", fields: [linkedUserId], references: [id], onDelete: SetNull)
+  displayName String
+  slug        String     @unique
+  relationship String
+  photoUrl    String?
+  bio         String
+  birthday    DateTime?
+  anniversary DateTime?
+  primaryEventType PrimaryEventType?
+  isPrimary   Boolean    @default(false)
+  isManagedProfile Boolean @default(true)
+  gifts       GiftItem[]
+  managedConnections Connection[] @relation("ManagedProfileConnection")
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([ownerUserId])
+  @@index([linkedUserId])
+}
+
+model Connection {
+  id                 String           @id
+  requesterUserId    String
+  requester          User             @relation("ConnectionRequester", fields: [requesterUserId], references: [id], onDelete: Cascade)
+  targetUserId       String?
+  targetUser         User?            @relation("ConnectionTarget", fields: [targetUserId], references: [id], onDelete: SetNull)
+  managedProfileId   String?
+  managedProfile     Profile?         @relation("ManagedProfileConnection", fields: [managedProfileId], references: [id], onDelete: Cascade)
+  emailOrPhone       String?
+  status             ConnectionStatus @default(PENDING)
+  groupLabel         GroupLabel       @default(FAMILY)
+  customGroupLabel   String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([requesterUserId])
+  @@index([targetUserId])
+  @@index([managedProfileId])
+}
+
+model GiftItem {
+  id                         String                      @id
+  profileId                  String
+  profile                    Profile                     @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  createdByUserId            String
+  createdByUser              User                        @relation("GiftCreator", fields: [createdByUserId], references: [id])
+  title                      String
+  productUrl                 String
+  originalUrl                String
+  affiliateUrl               String?
+  monetizedUrl               String
+  affiliateStatus            AffiliateStatus             @default(not_checked)
+  storeName                  String
+  imageUrl                   String
+  price                      Float                       @default(0)
+  currency                   String                      @default("USD")
+  notes                      String
+  eventTag                   EventTag
+  customEventTag             String?
+  wantRating                 Int
+  visibility                 Visibility
+  hiddenFromRecipient        Boolean                     @default(false)
+  allowContributions         Boolean                     @default(false)
+  fundingGoalAmount          Float                       @default(0)
+  currentContributionAmount  Float                       @default(0)
+  reservedStatus             ReservationStatus           @default(available)
+  reservedBy                 String?
+  purchasedStatus            Boolean                     @default(false)
+  reservations               Reservation[]
+  contributionPlaceholders   ContributionPlaceholder[]
+  createdAt                  DateTime                    @default(now())
+  updatedAt                  DateTime                    @updatedAt
+
+  @@index([profileId])
+  @@index([profileId, visibility, purchasedStatus])
+}
+
+model Reservation {
+  id             String            @id
+  giftItemId     String
+  giftItem       GiftItem          @relation(fields: [giftItemId], references: [id], onDelete: Cascade)
+  reserverName   String
+  reserverEmail  String?
+  status         ReservationRecordStatus @default(active)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([giftItemId])
+}
+
+model ContributionPlaceholder {
+  id                    String   @id
+  giftItemId            String
+  giftItem              GiftItem @relation(fields: [giftItemId], references: [id], onDelete: Cascade)
+  contributorName       String
+  contributorEmail      String?
+  amount                Float    @default(0)
+  status                String   @default("placeholder")
+  stripePaymentIntentId String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([giftItemId])
+}
+
+enum Visibility {
+  private
+  shared
+  public
+}
+
+enum EventTag {
+  Birthday
+  Christmas
+  Wedding
+  Baby_Shower
+  Housewarming
+  Graduation
+  General_Wishlist
+  Custom
+}
+
+enum ReservationStatus {
+  available
+  reserved
+}
+
+enum ReservationRecordStatus {
+  active
+  cancelled
+}
+
+enum AffiliateStatus {
+  not_checked
+  not_available
+  available
+  converted
+}
+
+enum ConnectionStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+enum GroupLabel {
+  FAMILY
+  FRIENDS
+  PARTNER
+  GUESTS
+  CUSTOM
+}
+
+enum PrimaryEventType {
+  BIRTHDAY
+  WEDDING
+  BABY
+  GENERAL
+}

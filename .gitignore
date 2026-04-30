@@ -1,0 +1,27 @@
+# dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# local environment
+.env
+.env.local
+.env.*.local
+
+# local Prisma/SQLite data
+prisma/dev.db
+prisma/dev.db-journal
+prisma/*.db
+prisma/*.db-journal
+
+# local caches and logs
+.npm-cache/
+.vercel/
+*.log
+tsconfig.tsbuildinfo
+
+# OS/editor
+.DS_Store
+Thumbs.db
