@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Eye, EyeOff } from "lucide-react";
+import { Check, Eye, EyeOff } from "lucide-react";
 import { Button, Field, Input } from "./ui";
 
 export function AuthForm({ mode }: { mode: "login" | "signup" }) {
@@ -12,27 +12,41 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", password: "", confirmPassword: "" });
 
-  const passwordLengthError = mode === "signup" && form.password.length > 0 && form.password.length < 8;
-  const passwordMatchError =
-    mode === "signup" &&
-    form.password.length >= 8 &&
-    form.confirmPassword.length > 0 &&
-    form.password !== form.confirmPassword;
+  const passwordChecks = {
+    length: form.password.length >= 8,
+    number: /\d/.test(form.password),
+    special: /[^A-Za-z0-9]/.test(form.password),
+    match: form.confirmPassword.length > 0 && form.password === form.confirmPassword
+  };
+  const signupPasswordIsValid = Object.values(passwordChecks).every(Boolean);
+
+  function Requirement({ met, children }: { met: boolean; children: React.ReactNode }) {
+    return (
+      <li className={`flex items-center gap-2 text-xs font-bold ${met ? "text-spruce" : "text-ink/50"}`}>
+        <span className={`inline-flex h-4 w-4 items-center justify-center rounded-full ${met ? "bg-mint text-spruce" : "bg-cloud text-ink/30"}`}>
+          {met ? <Check size={12} /> : null}
+        </span>
+        {children}
+      </li>
+    );
+  }
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setError("");
 
     if (mode === "signup") {
-      if (!form.password || !form.confirmPassword || form.password.length < 8) {
+      if (!form.password || !form.confirmPassword || !passwordChecks.length) {
         setError("Password must be at least 8 characters.");
         return;
       }
 
-      if (form.password !== form.confirmPassword) {
+      if (!passwordChecks.match) {
         setError("Passwords do not match.");
         return;
       }
+
+      if (!signupPasswordIsValid) return;
     }
 
     setLoading(true);
@@ -91,7 +105,9 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
               {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
           </div>
-          {passwordLengthError ? <p className="text-sm font-bold text-berry">Password must be at least 8 characters.</p> : null}
+          {mode === "signup" && form.password.length > 0 && !passwordChecks.length ? (
+            <p className="text-sm font-bold text-berry">Password must be at least 8 characters.</p>
+          ) : null}
         </div>
       </Field>
       {mode === "signup" ? (
@@ -115,20 +131,23 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
                 {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
-            {passwordMatchError ? <p className="text-sm font-bold text-berry">Passwords do not match.</p> : null}
+            {form.confirmPassword.length > 0 && !passwordChecks.match ? <p className="text-sm font-bold text-berry">Passwords do not match.</p> : null}
+            <ul className="grid gap-1 rounded-2xl bg-cloud p-3">
+              <Requirement met={passwordChecks.length}>8+ characters</Requirement>
+              <Requirement met={passwordChecks.number}>At least 1 number</Requirement>
+              <Requirement met={passwordChecks.special}>At least 1 special character</Requirement>
+              <Requirement met={passwordChecks.match}>Passwords match</Requirement>
+            </ul>
           </div>
         </Field>
       ) : null}
       {error ? <p className="rounded-2xl bg-blush p-3 text-sm font-bold text-berry">{error}</p> : null}
-      <Button type="submit" disabled={loading}>{loading ? "Please wait..." : mode === "login" ? "Log In" : "Create Account"}</Button>
+      <Button type="submit" disabled={loading || (mode === "signup" && !signupPasswordIsValid)}>{loading ? "Please wait..." : mode === "login" ? "Log In" : "Create Account"}</Button>
       <p className="text-center text-sm font-bold text-ink/60">
         {mode === "login" ? "Need an account? " : "Already have an account? "}
         <Link className="text-spruce underline" href={mode === "login" ? "/signup" : "/login"}>
           {mode === "login" ? "Sign up" : "Log in"}
         </Link>
-      </p>
-      <p className="rounded-2xl bg-cloud p-3 text-xs font-bold text-ink/60">
-        Demo login: demo@giftly.local / giftly-demo-123
       </p>
     </form>
   );

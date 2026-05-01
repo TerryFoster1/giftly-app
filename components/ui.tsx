@@ -28,10 +28,10 @@ export function Field({ label, children }: { label: string; children: React.Reac
   );
 }
 
-export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
+export function Input({ className = "", ...props }: InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
-      className="focus-ring min-h-11 rounded-2xl border border-ink/10 bg-white px-3 text-sm font-medium shadow-sm"
+      className={`focus-ring min-h-11 rounded-2xl border border-ink/10 bg-white px-3 text-sm font-medium shadow-sm ${className}`}
       {...props}
     />
   );
