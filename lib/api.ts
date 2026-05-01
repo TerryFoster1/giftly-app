@@ -25,6 +25,12 @@ export async function withUser<T>(handler: (user: Awaited<ReturnType<typeof requ
     if (error instanceof Error && error.message === "AUTH_SECRET_REQUIRED") {
       return NextResponse.json({ message: "Server auth secret is not configured." }, { status: 500 });
     }
+    if (error instanceof Error && error.message === "DATABASE_URL_REQUIRED") {
+      return NextResponse.json({ message: "Server database URL is not configured." }, { status: 500 });
+    }
+    if (error instanceof Error && error.message === "VERCEL_REQUIRES_POSTGRES_DATABASE_URL") {
+      return NextResponse.json({ message: "Vercel requires a hosted Postgres database URL." }, { status: 500 });
+    }
     return NextResponse.json({ message: "Something went wrong" }, { status: 500 });
   }
 }

@@ -58,6 +58,8 @@ npm run vercel-build
 
 That command generates Prisma Client from the Postgres schema before running the Next.js build.
 
+Important: do not use SQLite on Vercel. `DATABASE_URL=file:./dev.db` is local-only and will break live signup/session writes because Vercel deployments do not provide a persistent SQLite file. Production and preview deployments must use a hosted Postgres connection string.
+
 ### Required Vercel Environment Variables
 
 Set these in Vercel Project Settings, for Production, Preview, and Development as needed:
@@ -68,6 +70,8 @@ AUTH_SECRET=generate-a-long-random-secret
 NEXT_PUBLIC_APP_URL=https://your-vercel-domain.vercel.app
 APP_BASE_URL=https://your-vercel-domain.vercel.app
 ```
+
+If live signup returns a temporary-unavailable message, check Vercel Function Logs for `[signup]`. Database config errors will now log specifically instead of being shown to users as duplicate-email errors.
 
 `AUTH_SECRET` should be a long random value. You can generate one locally with:
 
