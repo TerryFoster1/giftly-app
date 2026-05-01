@@ -65,6 +65,15 @@ export type GiftItem = {
   storeName: string;
   imageUrl: string;
   price: number;
+  originalPrice?: number;
+  currentPrice?: number;
+  shippingCost?: number;
+  estimatedTotalCost?: number;
+  priceSourceUrl?: string;
+  bestFoundPrice?: number;
+  bestFoundTotalCost?: number;
+  bestFoundStoreName?: string;
+  priceLastCheckedAt?: string;
   currency: string;
   notes: string;
   eventTag: EventTag;

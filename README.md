@@ -56,7 +56,7 @@ Connect the GitHub repo to Vercel and keep the checked-in `vercel.json`. Vercel 
 npm run vercel-build
 ```
 
-That command generates Prisma Client from the Postgres schema before running the Next.js build.
+That command runs pending Postgres migrations, generates Prisma Client from the Postgres schema, and then runs the Next.js build.
 
 Important: do not use SQLite on Vercel. `DATABASE_URL=file:./dev.db` is local-only and will break live signup/session writes because Vercel deployments do not provide a persistent SQLite file. Production and preview deployments must use a hosted Postgres connection string.
 
@@ -81,7 +81,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 
 ### Production Database Migration
 
-After Vercel has the production `DATABASE_URL`, run the Postgres migration once from your machine or a trusted deployment shell:
+The Vercel build runs pending Postgres migrations automatically. To run them manually from your machine or a trusted deployment shell:
 
 ```powershell
 cd "C:\Users\kathr\Documents\Claude CoWork Files\Projects\Apps\giftly-app"

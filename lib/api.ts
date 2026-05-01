@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { isAuthError, requireCurrentUser } from "./auth";
 
 function json<T>(body: T, status = 200) {
@@ -15,6 +16,18 @@ export async function withUser<T>(handler: (user: Awaited<ReturnType<typeof requ
     const user = await requireCurrentUser();
     return json(await handler(user));
   } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      console.error("[api] Prisma request error", {
+        code: error.code,
+        message: error.message,
+        meta: error.meta
+      });
+
+      if (error.code === "P2022") {
+        return json({ message: "Giftly needs the latest database migration before this can be saved." }, 500);
+      }
+    }
+
     if (isAuthError(error)) return json({ message: "Your session expired. Please log in again." }, 401);
     if (error instanceof Error && error.message === "FORBIDDEN") {
       return json({ message: "Not allowed" }, 403);

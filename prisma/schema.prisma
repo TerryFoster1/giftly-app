@@ -94,6 +94,15 @@ model GiftItem {
   storeName                  String
   imageUrl                   String
   price                      Float                       @default(0)
+  originalPrice              Float?
+  currentPrice               Float?
+  shippingCost               Float?
+  estimatedTotalCost         Float?
+  priceSourceUrl             String?
+  bestFoundPrice             Float?
+  bestFoundTotalCost         Float?
+  bestFoundStoreName         String?
+  priceLastCheckedAt         DateTime?
   currency                   String                      @default("USD")
   notes                      String
   eventTag                   EventTag

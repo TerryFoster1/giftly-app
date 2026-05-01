@@ -1,0 +1,9 @@
+ALTER TABLE "GiftItem" ADD COLUMN "originalPrice" REAL;
+ALTER TABLE "GiftItem" ADD COLUMN "currentPrice" REAL;
+ALTER TABLE "GiftItem" ADD COLUMN "shippingCost" REAL;
+ALTER TABLE "GiftItem" ADD COLUMN "estimatedTotalCost" REAL;
+ALTER TABLE "GiftItem" ADD COLUMN "priceSourceUrl" TEXT;
+ALTER TABLE "GiftItem" ADD COLUMN "bestFoundPrice" REAL;
+ALTER TABLE "GiftItem" ADD COLUMN "bestFoundTotalCost" REAL;
+ALTER TABLE "GiftItem" ADD COLUMN "bestFoundStoreName" TEXT;
+ALTER TABLE "GiftItem" ADD COLUMN "priceLastCheckedAt" DATETIME;

@@ -8,7 +8,7 @@ import { Button, Field, Input, Select, Textarea } from "./ui";
 type GiftFormProps = {
   profileId: string;
   gift?: GiftItem;
-  onSave: (gift: GiftItem) => void;
+  onSave: (gift: GiftItem) => void | Promise<void>;
   onCancel: () => void;
 };
 
@@ -17,11 +17,15 @@ export function GiftForm({ profileId, gift, onSave, onCancel }: GiftFormProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [fetchingMetadata, setFetchingMetadata] = useState(false);
   const [metadataMessage, setMetadataMessage] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [form, setForm] = useState({
     title: gift?.title ?? "",
     productUrl: gift?.productUrl ?? "",
     imageUrl: gift?.imageUrl ?? "",
     price: gift?.price.toString() ?? "",
+    shippingCost: gift?.shippingCost?.toString() ?? "",
+    priceSourceUrl: gift?.priceSourceUrl ?? "",
     storeName: gift?.storeName ?? "",
     currency: gift?.currency ?? "USD",
     notes: gift?.notes ?? "",
@@ -34,6 +38,11 @@ export function GiftForm({ profileId, gift, onSave, onCancel }: GiftFormProps) {
 
   function update(name: string, value: string | boolean) {
     setForm((current) => ({ ...current, [name]: value }));
+  }
+
+  function amount(value: string) {
+    const parsed = Number(value || 0);
+    return Number.isFinite(parsed) ? parsed : 0;
   }
 
   async function fetchDetails() {
@@ -58,7 +67,8 @@ export function GiftForm({ profileId, gift, onSave, onCancel }: GiftFormProps) {
         imageUrl: metadata.imageUrl || current.imageUrl,
         storeName: metadata.storeName || metadata.siteName || current.storeName,
         price: metadata.price ? String(metadata.price) : current.price,
-        currency: metadata.currency || current.currency
+        currency: metadata.currency || current.currency,
+        priceSourceUrl: metadata.canonicalUrl || current.priceSourceUrl
       }));
       setMetadataMessage(metadata.error || "Gift details filled in. You can edit anything before saving.");
     } catch {
@@ -68,38 +78,55 @@ export function GiftForm({ profileId, gift, onSave, onCancel }: GiftFormProps) {
     }
   }
 
-  function submit(event: React.FormEvent) {
+  async function submit(event: React.FormEvent) {
     event.preventDefault();
+    setSaveError("");
     const stamp = new Date().toISOString();
     const productUrl = form.productUrl.trim();
-    onSave({
-      id: gift?.id ?? `gift_${crypto.randomUUID()}`,
-      profileId,
-      createdByUserId: gift?.createdByUserId ?? "current_user",
-      title: form.title || "Untitled gift",
-      productUrl,
-      originalUrl: gift?.originalUrl ?? productUrl,
-      affiliateUrl: gift?.affiliateUrl,
-      monetizedUrl: gift?.monetizedUrl ?? productUrl,
-      affiliateStatus: gift?.affiliateStatus ?? "not_checked",
-      storeName: form.storeName || "Unknown store",
-      imageUrl: form.imageUrl || "https://images.unsplash.com/photo-1513201099705-a9746e1e201f?q=80&w=600&auto=format&fit=crop",
-      price: Number(form.price || 0),
-      currency: form.currency || "USD",
-      notes: form.notes,
-      eventTag: form.eventTag as EventTag,
-      wantRating: Number(form.wantRating) as GiftItem["wantRating"],
-      visibility: form.visibility as Visibility,
-      hiddenFromRecipient: form.hiddenFromRecipient,
-      allowContributions,
-      fundingGoalAmount: allowContributions ? Number(form.fundingGoalAmount || form.price || 0) : 0,
-      currentContributionAmount: gift?.currentContributionAmount ?? 0,
-      reservedStatus: gift?.reservedStatus ?? "available",
-      reservedBy: gift?.reservedBy,
-      purchasedStatus: gift?.purchasedStatus ?? false,
-      createdAt: gift?.createdAt ?? stamp,
-      updatedAt: stamp
-    });
+    setSaving(true);
+    try {
+      await onSave({
+        id: gift?.id ?? `gift_${crypto.randomUUID()}`,
+        profileId,
+        createdByUserId: gift?.createdByUserId ?? "current_user",
+        title: form.title || "Untitled gift",
+        productUrl,
+        originalUrl: gift?.originalUrl ?? productUrl,
+        affiliateUrl: gift?.affiliateUrl,
+        monetizedUrl: gift?.monetizedUrl ?? productUrl,
+        affiliateStatus: gift?.affiliateStatus ?? "not_checked",
+        storeName: form.storeName || "Unknown store",
+        imageUrl: form.imageUrl || "https://images.unsplash.com/photo-1513201099705-a9746e1e201f?q=80&w=600&auto=format&fit=crop",
+        price: amount(form.price),
+        originalPrice: gift?.originalPrice ?? amount(form.price),
+        currentPrice: amount(form.price),
+        shippingCost: form.shippingCost ? amount(form.shippingCost) : gift?.shippingCost,
+        estimatedTotalCost: amount(form.price) + amount(form.shippingCost),
+        priceSourceUrl: form.priceSourceUrl || form.productUrl || undefined,
+        bestFoundPrice: gift?.bestFoundPrice,
+        bestFoundTotalCost: gift?.bestFoundTotalCost,
+        bestFoundStoreName: gift?.bestFoundStoreName,
+        priceLastCheckedAt: gift?.priceLastCheckedAt,
+        currency: form.currency || "USD",
+        notes: form.notes,
+        eventTag: form.eventTag as EventTag,
+        wantRating: Number(form.wantRating) as GiftItem["wantRating"],
+        visibility: form.visibility as Visibility,
+        hiddenFromRecipient: form.hiddenFromRecipient,
+        allowContributions,
+        fundingGoalAmount: allowContributions ? amount(form.fundingGoalAmount || form.price) : 0,
+        currentContributionAmount: gift?.currentContributionAmount ?? 0,
+        reservedStatus: gift?.reservedStatus ?? "available",
+        reservedBy: gift?.reservedBy,
+        purchasedStatus: gift?.purchasedStatus ?? false,
+        createdAt: gift?.createdAt ?? stamp,
+        updatedAt: stamp
+      });
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "Gift could not be saved. Please try again.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -127,6 +154,12 @@ export function GiftForm({ profileId, gift, onSave, onCancel }: GiftFormProps) {
         <Field label="Product name">
           <Input required value={form.title} onChange={(event) => update("title", event.target.value)} />
         </Field>
+        <Field label="Price">
+          <Input inputMode="decimal" value={form.price} onChange={(event) => update("price", event.target.value)} />
+        </Field>
+        <Field label="Currency">
+          <Input value={form.currency} onChange={(event) => update("currency", event.target.value.toUpperCase())} />
+        </Field>
         <Field label="Event">
           <Select value={form.eventTag} onChange={(event) => update("eventTag", event.target.value)}>
             {eventTags.map((tag) => (
@@ -150,6 +183,9 @@ export function GiftForm({ profileId, gift, onSave, onCancel }: GiftFormProps) {
             <option value="public">Public</option>
           </Select>
         </Field>
+        <p className="rounded-2xl bg-cloud p-3 text-xs font-bold leading-5 text-ink/60 sm:col-span-2">
+          Future: Giftly can check for a better total price, including shipping.
+        </p>
       </div>
       <Field label="Notes">
         <Textarea value={form.notes} onChange={(event) => update("notes", event.target.value)} />
@@ -171,11 +207,11 @@ export function GiftForm({ profileId, gift, onSave, onCancel }: GiftFormProps) {
             <Field label="Store name">
               <Input value={form.storeName} onChange={(event) => update("storeName", event.target.value)} />
             </Field>
-            <Field label="Price">
-              <Input inputMode="decimal" value={form.price} onChange={(event) => update("price", event.target.value)} />
+            <Field label="Shipping cost">
+              <Input inputMode="decimal" value={form.shippingCost} onChange={(event) => update("shippingCost", event.target.value)} />
             </Field>
-            <Field label="Currency">
-              <Input value={form.currency} onChange={(event) => update("currency", event.target.value.toUpperCase())} />
+            <Field label="Price source URL">
+              <Input type="url" value={form.priceSourceUrl} onChange={(event) => update("priceSourceUrl", event.target.value)} />
             </Field>
           </div>
         ) : null}
@@ -203,9 +239,10 @@ export function GiftForm({ profileId, gift, onSave, onCancel }: GiftFormProps) {
           <Input inputMode="decimal" value={form.fundingGoalAmount} onChange={(event) => update("fundingGoalAmount", event.target.value)} />
         </Field>
       ) : null}
-      <Button type="submit">
+      {saveError ? <p className="rounded-2xl bg-blush p-3 text-sm font-bold text-berry">{saveError}</p> : null}
+      <Button type="submit" disabled={saving}>
         <Save size={16} />
-        Save Gift
+        {saving ? "Saving..." : "Save Gift"}
       </Button>
     </form>
   );
