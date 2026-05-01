@@ -26,6 +26,7 @@ export function GiftCard({
   onContribute
 }: GiftCardProps) {
   const progress = gift.fundingGoalAmount ? Math.min(100, (gift.currentContributionAmount / gift.fundingGoalAmount) * 100) : 0;
+  const priceLabel = gift.currency ? `${gift.currency} $${gift.price.toFixed(2)}` : gift.price.toFixed(2);
 
   return (
     <article className="overflow-hidden rounded-[1.5rem] border border-ink/10 bg-white shadow-sm">
@@ -37,7 +38,7 @@ export function GiftCard({
           <div>
             <p className="text-xs font-black uppercase text-berry">{gift.eventTag}</p>
             <h3 className="text-lg font-black leading-tight">{gift.title}</h3>
-            <p className="text-sm font-bold text-ink/55">{gift.storeName} · {gift.currency} ${gift.price.toFixed(2)}</p>
+            <p className="text-sm font-bold text-ink/55">{gift.storeName} · {priceLabel}</p>
           </div>
           <Hearts value={gift.wantRating} />
         </div>

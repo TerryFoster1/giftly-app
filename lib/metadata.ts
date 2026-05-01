@@ -143,6 +143,11 @@ function stringFromSchema(value: unknown) {
   return undefined;
 }
 
+function normalizeCurrency(value?: string) {
+  const currency = value?.trim().toUpperCase();
+  return currency && /^[A-Z]{3}$/.test(currency) ? currency : undefined;
+}
+
 function parseJsonLd(html: string) {
   const scripts = html.match(/<script\b[^>]*type=["']application\/ld\+json["'][^>]*>[\s\S]*?<\/script>/gi) ?? [];
   for (const script of scripts) {
@@ -158,7 +163,7 @@ function parseJsonLd(html: string) {
         title: stringFromSchema(product.name),
         imageUrl: stringFromSchema(product.image),
         price: typeof offer.price === "number" ? String(offer.price) : stringFromSchema(offer.price),
-        currency: stringFromSchema(offer.priceCurrency),
+        currency: normalizeCurrency(stringFromSchema(offer.priceCurrency)),
         siteName: stringFromSchema(product.brand) || stringFromSchema(offer.seller)
       };
     } catch {
@@ -232,6 +237,12 @@ export async function extractUrlMetadata(inputUrl: string): Promise<UrlMetadata>
     const finalParsedUrl = new URL(finalUrl);
     const canonicalUrl = getCanonical(html, finalUrl) || absolutizeUrl(getMeta(html, "og:url"), finalUrl) || finalUrl;
     const siteName = getMeta(html, "og:site_name") || schema.siteName || deriveStoreName(finalParsedUrl);
+    const price = schema.price || getMeta(html, "product:price:amount") || getMeta(html, "og:price:amount");
+    const explicitCurrency =
+      normalizeCurrency(schema.currency) ||
+      normalizeCurrency(getMeta(html, "product:price:currency")) ||
+      normalizeCurrency(getMeta(html, "og:price:currency"));
+    const domainCurrency = finalParsedUrl.hostname.toLowerCase().endsWith("amazon.ca") && price ? "CAD" : undefined;
 
     return {
       title: schema.title || getMeta(html, "og:title") || getMeta(html, "twitter:title") || getTitle(html),
@@ -239,8 +250,8 @@ export async function extractUrlMetadata(inputUrl: string): Promise<UrlMetadata>
       imageUrl: absolutizeUrl(schema.imageUrl || getMeta(html, "og:image") || getMeta(html, "twitter:image"), finalUrl),
       siteName,
       storeName: siteName,
-      price: schema.price || getMeta(html, "product:price:amount") || getMeta(html, "og:price:amount"),
-      currency: schema.currency || getMeta(html, "product:price:currency") || getMeta(html, "og:price:currency"),
+      price,
+      currency: explicitCurrency || domainCurrency,
       canonicalUrl
     };
   } catch {

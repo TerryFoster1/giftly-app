@@ -19,6 +19,7 @@ export function DashboardClient({ initialSlug }: { initialSlug?: string }) {
   const [sort, setSort] = useState("newest");
   const [editing, setEditing] = useState<GiftItem | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [giftMessage, setGiftMessage] = useState("");
 
   const selectedProfile = useMemo(() => {
     if (!profiles.length) return undefined;
@@ -41,12 +42,15 @@ export function DashboardClient({ initialSlug }: { initialSlug?: string }) {
   }, [eventFilter, gifts, selectedProfile, sort, visibilityFilter]);
 
   async function saveGift(gift: GiftItem) {
+    setGiftMessage("");
     try {
       await actions.saveGift(gift);
+      await actions.refresh();
+      setGiftMessage("Gift saved.");
       setShowForm(false);
       setEditing(null);
-    } catch {
-      // The shared store surfaces the friendly error message.
+    } catch (error) {
+      throw error;
     }
   }
 
@@ -113,6 +117,7 @@ export function DashboardClient({ initialSlug }: { initialSlug?: string }) {
         </Link>
       </aside>
       <section className="grid gap-5">
+        {giftMessage ? <p className="rounded-2xl bg-mint p-3 text-sm font-bold text-spruce">{giftMessage}</p> : null}
         {actionError ? <p className="rounded-2xl bg-blush p-3 text-sm font-bold text-berry">{actionError}</p> : null}
         {upcomingEvents.length ? (
           <section className="rounded-[2rem] border border-ink/10 bg-white p-4 shadow-soft">

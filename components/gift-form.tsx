@@ -27,7 +27,7 @@ export function GiftForm({ profileId, gift, onSave, onCancel }: GiftFormProps) {
     shippingCost: gift?.shippingCost?.toString() ?? "",
     priceSourceUrl: gift?.priceSourceUrl ?? "",
     storeName: gift?.storeName ?? "",
-    currency: gift?.currency ?? "USD",
+    currency: gift?.currency ?? "",
     notes: gift?.notes ?? "",
     eventTag: gift?.eventTag ?? "General Wishlist",
     wantRating: String(gift?.wantRating ?? 3),
@@ -67,7 +67,7 @@ export function GiftForm({ profileId, gift, onSave, onCancel }: GiftFormProps) {
         imageUrl: metadata.imageUrl || current.imageUrl,
         storeName: metadata.storeName || metadata.siteName || current.storeName,
         price: metadata.price ? String(metadata.price) : current.price,
-        currency: metadata.currency || current.currency,
+        currency: metadata.currency ?? current.currency,
         priceSourceUrl: metadata.canonicalUrl || current.priceSourceUrl
       }));
       setMetadataMessage(metadata.error || "Gift details filled in. You can edit anything before saving.");
@@ -107,7 +107,7 @@ export function GiftForm({ profileId, gift, onSave, onCancel }: GiftFormProps) {
         bestFoundTotalCost: gift?.bestFoundTotalCost,
         bestFoundStoreName: gift?.bestFoundStoreName,
         priceLastCheckedAt: gift?.priceLastCheckedAt,
-        currency: form.currency || "USD",
+        currency: form.currency.trim().toUpperCase(),
         notes: form.notes,
         eventTag: form.eventTag as EventTag,
         wantRating: Number(form.wantRating) as GiftItem["wantRating"],
