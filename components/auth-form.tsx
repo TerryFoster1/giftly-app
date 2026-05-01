@@ -53,6 +53,8 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
 
     const response = await fetch(`/api/auth/${mode}`, {
       method: "POST",
+      credentials: "include",
+      cache: "no-store",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: form.name,

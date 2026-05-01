@@ -59,14 +59,22 @@ export async function clearUserSession() {
 
 export async function getCurrentUser() {
   const token = cookies().get(sessionCookieName)?.value;
-  if (!token) return null;
+  if (!token) {
+    console.warn("[auth] Session lookup failed", { reason: "missing_cookie" });
+    return null;
+  }
 
+  const tokenHash = hashToken(token);
   const session = await prisma.session.findUnique({
-    where: { tokenHash: hashToken(token) },
+    where: { tokenHash },
     include: { user: true }
   });
 
   if (!session || session.expiresAt < new Date()) {
+    console.warn("[auth] Session lookup failed", {
+      reason: session ? "expired_session" : "missing_session",
+      hasCookie: true
+    });
     if (session) await prisma.session.delete({ where: { id: session.id } });
     return null;
   }

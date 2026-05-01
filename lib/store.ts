@@ -123,8 +123,9 @@ export function useGiftlyStore() {
       },
       async saveGift(gift: GiftItem) {
         return runAction(async () => {
-          const saved = await requestJson<GiftItem>(gift.id ? `/api/gifts/${gift.id}` : "/api/gifts", {
-            method: gift.id ? "PUT" : "POST",
+          const isExistingGift = store.gifts.some((item) => item.id === gift.id);
+          const saved = await requestJson<GiftItem>(isExistingGift ? `/api/gifts/${gift.id}` : "/api/gifts", {
+            method: isExistingGift ? "PUT" : "POST",
             body: JSON.stringify(gift)
           });
           setStore((current) => {
@@ -189,7 +190,7 @@ export function useGiftlyStore() {
       },
       refresh
     }),
-    [refresh]
+    [refresh, store.gifts]
   );
 
   return { ...store, ready, actionError, actions };
