@@ -11,7 +11,7 @@ import { Button, Field, Input, Select, Textarea } from "./ui";
 import { QrCard } from "./qr-card";
 
 export function ProfilesClient() {
-  const { user, profiles, connections = [], actions, ready } = useGiftlyStore();
+  const { user, profiles, connections = [], actionError, actions, ready } = useGiftlyStore();
   const [showForm, setShowForm] = useState(false);
   const [shareSlug, setShareSlug] = useState("");
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
@@ -34,40 +34,52 @@ export function ProfilesClient() {
 
   if (!ready) return <main className="mx-auto max-w-6xl px-4 py-10 font-bold">Loading profiles…</main>;
 
-  function createProfile(event: React.FormEvent) {
+  async function createProfile(event: React.FormEvent) {
     event.preventDefault();
-    if (form.hasAccount === "yes") {
-      actions.createConnection({
-        emailOrPhone: form.emailOrPhone,
-        groupLabel: form.groupLabel,
-        customGroupLabel: form.customGroupLabel
-      });
-    } else {
-      actions.createProfile({
-        displayName: form.displayName,
-        relationship: form.relationship,
-        bio: form.bio,
-        photoUrl: form.photoUrl,
-        birthday: form.birthday,
-        anniversary: form.anniversary,
-        groupLabel: form.groupLabel,
-        customGroupLabel: form.customGroupLabel
-      });
+    try {
+      if (form.hasAccount === "yes") {
+        await actions.createConnection({
+          emailOrPhone: form.emailOrPhone,
+          groupLabel: form.groupLabel,
+          customGroupLabel: form.customGroupLabel
+        });
+      } else {
+        await actions.createProfile({
+          displayName: form.displayName,
+          relationship: form.relationship,
+          bio: form.bio,
+          photoUrl: form.photoUrl,
+          birthday: form.birthday,
+          anniversary: form.anniversary,
+          groupLabel: form.groupLabel,
+          customGroupLabel: form.customGroupLabel
+        });
+      }
+      setForm({ displayName: "", relationship: "", bio: "", photoUrl: "", birthday: "", anniversary: "", hasAccount: "no", emailOrPhone: "", groupLabel: "FAMILY", customGroupLabel: "" });
+      setShowForm(false);
+    } catch {
+      // The shared store surfaces the friendly error message.
     }
-    setForm({ displayName: "", relationship: "", bio: "", photoUrl: "", birthday: "", anniversary: "", hasAccount: "no", emailOrPhone: "", groupLabel: "FAMILY", customGroupLabel: "" });
-    setShowForm(false);
   }
 
   async function deleteProfile(id: string, name: string) {
     if (!window.confirm(`Delete ${name}? This will also delete that profile's gift items, reservations, and contribution records.`)) return;
-    await actions.deleteProfile(id);
-    if (profiles.find((profile) => profile.id === id)?.slug === shareSlug) setShareSlug("");
+    try {
+      await actions.deleteProfile(id);
+      if (profiles.find((profile) => profile.id === id)?.slug === shareSlug) setShareSlug("");
+    } catch {
+      // The shared store surfaces the friendly error message.
+    }
   }
 
   async function resetMyData() {
-    await actions.resetMyGiftlyData();
-    setShareSlug("");
-    setResetConfirmOpen(false);
+    try {
+      await actions.resetMyGiftlyData();
+      setShareSlug("");
+      setResetConfirmOpen(false);
+    } catch {
+      // The shared store surfaces the friendly error message.
+    }
   }
 
   async function saveVanityUrl(profileId: string, currentSlug: string) {
@@ -87,8 +99,12 @@ export function ProfilesClient() {
       birthday: profileBirthday ? profileBirthday.slice(0, 10) : "",
       anniversary: profileAnniversary ? profileAnniversary.slice(0, 10) : ""
     };
-    await actions.updateProfileEvents(profileId, draft);
-    setEventMessage("Profile dates saved.");
+    try {
+      await actions.updateProfileEvents(profileId, draft);
+      setEventMessage("Profile dates saved.");
+    } catch {
+      // The shared store surfaces the friendly error message.
+    }
   }
 
   const groupOptions: GroupLabel[] = ["FAMILY", "FRIENDS", "PARTNER", "GUESTS", "CUSTOM"];
@@ -96,6 +112,7 @@ export function ProfilesClient() {
   return (
     <main className="mx-auto grid max-w-6xl gap-6 px-4 py-6 lg:grid-cols-[1fr_22rem]">
       <section className="grid gap-4">
+        {actionError ? <p className="rounded-2xl bg-blush p-3 text-sm font-bold text-berry">{actionError}</p> : null}
         <div className="flex flex-col gap-4 rounded-[2rem] border border-ink/10 bg-white p-4 shadow-soft sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm font-black uppercase text-berry">Family profiles</p>

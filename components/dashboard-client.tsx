@@ -12,7 +12,7 @@ import { GiftForm } from "./gift-form";
 import { Button, Select } from "./ui";
 
 export function DashboardClient({ initialSlug }: { initialSlug?: string }) {
-  const { user, profiles, gifts, ready, actions } = useGiftlyStore();
+  const { user, profiles, gifts, ready, actionError, actions } = useGiftlyStore();
   const [selectedProfileId, setSelectedProfileId] = useState("");
   const [eventFilter, setEventFilter] = useState("All");
   const [visibilityFilter, setVisibilityFilter] = useState<Visibility | "All">("All");
@@ -40,27 +40,49 @@ export function DashboardClient({ initialSlug }: { initialSlug?: string }) {
       });
   }, [eventFilter, gifts, selectedProfile, sort, visibilityFilter]);
 
-  function saveGift(gift: GiftItem) {
-    actions.saveGift(gift);
-    setShowForm(false);
-    setEditing(null);
+  async function saveGift(gift: GiftItem) {
+    try {
+      await actions.saveGift(gift);
+      setShowForm(false);
+      setEditing(null);
+    } catch {
+      // The shared store surfaces the friendly error message.
+    }
   }
 
-  function toggleReserved(gift: GiftItem) {
-    actions.saveGift({
-      ...gift,
-      reservedStatus: gift.reservedStatus === "reserved" ? "available" : "reserved",
-      reservedBy: gift.reservedStatus === "reserved" ? undefined : "Planned",
-      updatedAt: new Date().toISOString()
-    });
+  async function toggleReserved(gift: GiftItem) {
+    try {
+      await actions.saveGift({
+        ...gift,
+        reservedStatus: gift.reservedStatus === "reserved" ? "available" : "reserved",
+        reservedBy: gift.reservedStatus === "reserved" ? undefined : "Planned",
+        updatedAt: new Date().toISOString()
+      });
+    } catch {
+      // The shared store surfaces the friendly error message.
+    }
   }
 
-  function togglePurchased(gift: GiftItem) {
-    actions.saveGift({ ...gift, purchasedStatus: !gift.purchasedStatus, updatedAt: new Date().toISOString() });
+  async function togglePurchased(gift: GiftItem) {
+    try {
+      await actions.saveGift({ ...gift, purchasedStatus: !gift.purchasedStatus, updatedAt: new Date().toISOString() });
+    } catch {
+      // The shared store surfaces the friendly error message.
+    }
   }
 
-  if (!ready || !selectedProfile) {
+  if (!ready) {
     return <main className="mx-auto max-w-6xl px-4 py-10 font-bold">Loading Giftly…</main>;
+  }
+
+  if (!selectedProfile) {
+    return (
+      <main className="mx-auto max-w-6xl px-4 py-10">
+        <p className="rounded-2xl bg-blush p-3 text-sm font-bold text-berry">
+          {actionError || "No profiles are available yet."}
+        </p>
+      </main>
+    );
   }
 
   return (
@@ -91,6 +113,7 @@ export function DashboardClient({ initialSlug }: { initialSlug?: string }) {
         </Link>
       </aside>
       <section className="grid gap-5">
+        {actionError ? <p className="rounded-2xl bg-blush p-3 text-sm font-bold text-berry">{actionError}</p> : null}
         {upcomingEvents.length ? (
           <section className="rounded-[2rem] border border-ink/10 bg-white p-4 shadow-soft">
             <p className="text-sm font-black uppercase text-berry">Upcoming Events</p>
