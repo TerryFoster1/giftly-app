@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { extractUrlMetadata } from "@/lib/metadata";
+import { normalizeProductUrl } from "@/lib/product-url";
 
 export const runtime = "nodejs";
 
@@ -10,7 +11,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Enter a valid product link." }, { status: 400 });
     }
 
-    const metadata = await extractUrlMetadata(body.url);
+    const normalized = normalizeProductUrl(body.url);
+    if (normalized.error || !normalized.url) {
+      return NextResponse.json({ error: normalized.error }, { status: 400 });
+    }
+
+    const metadata = await extractUrlMetadata(normalized.url);
     return NextResponse.json(metadata);
   } catch {
     return NextResponse.json({

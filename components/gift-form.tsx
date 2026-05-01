@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ChevronDown, Save, Search, X } from "lucide-react";
 import { eventTags, type EventTag, type GiftItem, type Visibility } from "@/lib/types";
+import { isAmazonUrl, normalizeProductUrl } from "@/lib/product-url";
 import { Button, Field, Input, Select, Textarea } from "./ui";
 
 type GiftFormProps = {
@@ -19,6 +20,7 @@ export function GiftForm({ profileId, gift, onSave, onCancel }: GiftFormProps) {
   const [metadataMessage, setMetadataMessage] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [urlError, setUrlError] = useState("");
   const [form, setForm] = useState({
     title: gift?.title ?? "",
     productUrl: gift?.productUrl ?? "",
@@ -47,23 +49,26 @@ export function GiftForm({ profileId, gift, onSave, onCancel }: GiftFormProps) {
 
   async function fetchDetails() {
     setMetadataMessage("");
-    if (!form.productUrl.trim()) {
-      setMetadataMessage("Paste a product link first.");
+    setUrlError("");
+    const normalized = normalizeProductUrl(form.productUrl);
+    if (normalized.error || !normalized.url) {
+      setUrlError(normalized.error ?? "Please paste the full product link, starting with https://");
       return;
     }
+    const shouldPreserveOriginalUrl = isAmazonUrl(normalized.url);
 
     setFetchingMetadata(true);
     try {
       const response = await fetch("/api/metadata", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ url: form.productUrl })
+        body: JSON.stringify({ url: normalized.url })
       });
       const metadata = await response.json();
       setForm((current) => ({
         ...current,
         title: metadata.title || current.title,
-        productUrl: metadata.canonicalUrl || current.productUrl,
+        productUrl: shouldPreserveOriginalUrl ? normalized.url : metadata.canonicalUrl || normalized.url,
         imageUrl: metadata.imageUrl || current.imageUrl,
         storeName: metadata.storeName || metadata.siteName || current.storeName,
         price: metadata.price ? String(metadata.price) : current.price,
@@ -81,8 +86,14 @@ export function GiftForm({ profileId, gift, onSave, onCancel }: GiftFormProps) {
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setSaveError("");
+    setUrlError("");
+    const normalized = normalizeProductUrl(form.productUrl);
+    if (normalized.error || !normalized.url) {
+      setUrlError(normalized.error ?? "Please paste the full product link, starting with https://");
+      return;
+    }
     const stamp = new Date().toISOString();
-    const productUrl = form.productUrl.trim();
+    const productUrl = normalized.url;
     setSaving(true);
     try {
       await onSave({
@@ -141,13 +152,14 @@ export function GiftForm({ profileId, gift, onSave, onCancel }: GiftFormProps) {
         <div className="sm:col-span-2">
           <Field label="Paste product link">
             <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-              <Input required type="url" value={form.productUrl} onChange={(event) => update("productUrl", event.target.value)} />
+              <Input required type="text" value={form.productUrl} onChange={(event) => update("productUrl", event.target.value)} />
               <Button type="button" variant="secondary" onClick={fetchDetails} disabled={fetchingMetadata}>
                 <Search size={16} />
                 {fetchingMetadata ? "Fetching..." : "Fetch details"}
               </Button>
             </div>
           </Field>
+          {urlError ? <p className="mt-2 text-sm font-bold text-berry">{urlError}</p> : null}
           {fetchingMetadata ? <p className="mt-2 text-sm font-bold text-ink/55">Fetching gift details...</p> : null}
           {metadataMessage ? <p className="mt-2 text-sm font-bold text-ink/60">{metadataMessage}</p> : null}
         </div>
