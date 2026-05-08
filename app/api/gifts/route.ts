@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { getOwnerStore, upsertGift } from "@/lib/db";
 import { withUser } from "@/lib/api";
 
@@ -10,6 +9,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const body = await request.json();
-  return withUser((user) => upsertGift(user, body));
+  return withUser(async (user) => {
+    const body = await request.json();
+    return upsertGift(user, body);
+  }, { logLabel: "gift-save" });
 }

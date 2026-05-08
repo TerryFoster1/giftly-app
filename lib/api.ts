@@ -11,18 +11,48 @@ function json<T>(body: T, status = 200) {
   });
 }
 
-export async function withUser<T>(handler: (user: Awaited<ReturnType<typeof requireCurrentUser>>) => Promise<T>) {
+type ApiLogOptions = {
+  logLabel?: string;
+};
+
+function logApiError(label: string, error: unknown) {
+  if (isAuthError(error)) {
+    console.warn(`[${label}] Missing authenticated session`);
+    return;
+  }
+
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    console.error(`[${label}] Prisma request error`, {
+      code: error.code,
+      message: error.message,
+      meta: error.meta
+    });
+    return;
+  }
+
+  if (error instanceof Error) {
+    console.error(`[${label}] Request error`, {
+      name: error.name,
+      message: error.message
+    });
+    return;
+  }
+
+  console.error(`[${label}] Unknown request error`, { error });
+}
+
+export async function withUser<T>(
+  handler: (user: Awaited<ReturnType<typeof requireCurrentUser>>) => Promise<T>,
+  options: ApiLogOptions = {}
+) {
+  const logLabel = options.logLabel ?? "api";
   try {
     const user = await requireCurrentUser();
     return json(await handler(user));
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      console.error("[api] Prisma request error", {
-        code: error.code,
-        message: error.message,
-        meta: error.meta
-      });
+    logApiError(logLabel, error);
 
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === "P2022") {
         return json({ message: "Giftly needs the latest database migration before this can be saved." }, 500);
       }
