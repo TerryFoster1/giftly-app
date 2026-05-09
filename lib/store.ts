@@ -24,10 +24,41 @@ const emptyStore: GiftlyStore = {
   reservations: []
 };
 
+function resolveClientApiUrl(url: string) {
+  if (typeof window === "undefined") return url;
+
+  const target = new URL(url, window.location.origin);
+  if (target.origin !== window.location.origin) {
+    throw new Error("Giftly tried to call an API route on a different domain. Please reload and try again.");
+  }
+
+  return `${target.pathname}${target.search}`;
+}
+
+function logClientApiRequest(url: string, credentials: RequestCredentials) {
+  if (typeof window === "undefined") return;
+
+  const target = new URL(url, window.location.origin);
+  console.info("[client-api] request", {
+    pageOrigin: window.location.origin,
+    requestOrigin: target.origin,
+    requestPath: target.pathname,
+    credentials,
+    visibleCookieNames: document.cookie
+      .split(";")
+      .map((part) => part.trim().split("=")[0])
+      .filter(Boolean)
+  });
+}
+
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, {
+  const requestUrl = resolveClientApiUrl(url);
+  logClientApiRequest(requestUrl, "include");
+
+  const response = await fetch(requestUrl, {
     ...init,
     credentials: "include",
+    mode: "same-origin",
     cache: "no-store",
     headers: {
       "Content-Type": "application/json",

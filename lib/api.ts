@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
-import { isAuthError, requireCurrentUser } from "./auth";
+import { getRequestCookieNames, isAuthError, requireCurrentUser } from "./auth";
 
 function json<T>(body: T, status = 200) {
   return NextResponse.json(body, {
@@ -48,6 +48,17 @@ export async function withUser<T>(
 ) {
   const logLabel = options.logLabel ?? "api";
   try {
+    if (options.request) {
+      const requestUrl = new URL(options.request.url);
+      console.info("[auth-debug] API request context", {
+        label: logLabel,
+        method: options.request.method,
+        requestOrigin: requestUrl.origin,
+        requestPath: requestUrl.pathname,
+        cookieNames: getRequestCookieNames(options.request)
+      });
+    }
+
     const user = await requireCurrentUser(options.request);
     return json(await handler(user));
   } catch (error) {
