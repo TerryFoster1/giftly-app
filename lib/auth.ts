@@ -20,6 +20,38 @@ function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
+function parseCookieHeader(header: string | null) {
+  const values = new Map<string, string>();
+  if (!header) return values;
+
+  for (const part of header.split(";")) {
+    const [rawName, ...rawValue] = part.trim().split("=");
+    if (!rawName) continue;
+    const value = rawValue.join("=");
+    try {
+      values.set(rawName, decodeURIComponent(value));
+    } catch {
+      values.set(rawName, value);
+    }
+  }
+
+  return values;
+}
+
+function getRequestCookie(request: Request | undefined, name: string) {
+  if (!request) return undefined;
+  return parseCookieHeader(request.headers.get("cookie")).get(name);
+}
+
+export function getRequestCookieNames(request?: Request) {
+  const requestCookieNames = Array.from(parseCookieHeader(request?.headers.get("cookie") ?? null).keys());
+  const nextCookieNames = cookies()
+    .getAll()
+    .map((cookie) => cookie.name);
+
+  return Array.from(new Set([...nextCookieNames, ...requestCookieNames])).sort();
+}
+
 export async function createUserSession(userId: string) {
   const token = randomBytes(32).toString("base64url");
   const expiresAt = new Date(Date.now() + sessionDays * 24 * 60 * 60 * 1000);
@@ -57,10 +89,14 @@ export async function clearUserSession() {
   });
 }
 
-export async function getCurrentUser() {
-  const token = cookies().get(sessionCookieName)?.value;
+export async function getCurrentUser(request?: Request) {
+  const token = cookies().get(sessionCookieName)?.value ?? getRequestCookie(request, sessionCookieName);
+  const cookieNames = getRequestCookieNames(request);
   if (!token) {
-    console.warn("[auth] Session lookup failed", { reason: "missing_cookie" });
+    console.warn("[auth-debug] Session lookup failed", {
+      reason: "missing_cookie",
+      cookieNames
+    });
     return null;
   }
 
@@ -71,13 +107,20 @@ export async function getCurrentUser() {
   });
 
   if (!session || session.expiresAt < new Date()) {
-    console.warn("[auth] Session lookup failed", {
+    console.warn("[auth-debug] Session lookup failed", {
       reason: session ? "expired_session" : "missing_session",
-      hasCookie: true
+      hasSessionCookie: true,
+      cookieNames
     });
     if (session) await prisma.session.delete({ where: { id: session.id } });
     return null;
   }
+
+  console.info("[auth-debug] Session lookup succeeded", {
+    result: "authenticated",
+    userId: session.user.id,
+    cookieNames
+  });
 
   return {
     id: session.user.id,
@@ -88,8 +131,8 @@ export async function getCurrentUser() {
   };
 }
 
-export async function requireCurrentUser() {
-  const user = await getCurrentUser();
+export async function requireCurrentUser(request?: Request) {
+  const user = await getCurrentUser(request);
   if (!user) throw new Error("UNAUTHENTICATED");
   return user;
 }

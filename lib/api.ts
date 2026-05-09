@@ -13,6 +13,7 @@ function json<T>(body: T, status = 200) {
 
 type ApiLogOptions = {
   logLabel?: string;
+  request?: Request;
 };
 
 function logApiError(label: string, error: unknown) {
@@ -47,7 +48,7 @@ export async function withUser<T>(
 ) {
   const logLabel = options.logLabel ?? "api";
   try {
-    const user = await requireCurrentUser();
+    const user = await requireCurrentUser(options.request);
     return json(await handler(user));
   } catch (error) {
     logApiError(logLabel, error);

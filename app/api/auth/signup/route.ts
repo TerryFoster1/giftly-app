@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     await signUpWithPassword(body);
-    return NextResponse.json({ ok: true }, { status: 201 });
+    return NextResponse.json({ ok: true }, { status: 201, headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     logSignupFailure(error);
 
