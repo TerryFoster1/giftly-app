@@ -52,7 +52,32 @@ export function getRequestCookieNames(request?: Request) {
   return Array.from(new Set([...nextCookieNames, ...requestCookieNames])).sort();
 }
 
-export async function createUserSession(userId: string) {
+export type SessionCookieAttachment = {
+  name: string;
+  value: string;
+  options: {
+    httpOnly: true;
+    sameSite: "lax";
+    secure: boolean;
+    path: "/";
+    maxAge: number;
+    expires: Date;
+  };
+};
+
+export type SessionCookieClear = {
+  name: string;
+  value: "";
+  options: {
+    httpOnly: true;
+    sameSite: "lax";
+    secure: boolean;
+    path: "/";
+    maxAge: 0;
+  };
+};
+
+export async function createUserSession(userId: string): Promise<SessionCookieAttachment> {
   const token = randomBytes(32).toString("base64url");
   const expiresAt = new Date(Date.now() + sessionDays * 24 * 60 * 60 * 1000);
 
@@ -65,28 +90,36 @@ export async function createUserSession(userId: string) {
     }
   });
 
-  cookies().set(sessionCookieName, token, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: sessionDays * 24 * 60 * 60,
-    expires: expiresAt
-  });
+  return {
+    name: sessionCookieName,
+    value: token,
+    options: {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: sessionDays * 24 * 60 * 60,
+      expires: expiresAt
+    }
+  };
 }
 
-export async function clearUserSession() {
+export async function clearUserSession(): Promise<SessionCookieClear> {
   const token = cookies().get(sessionCookieName)?.value;
   if (token) {
     await prisma.session.deleteMany({ where: { tokenHash: hashToken(token) } });
   }
-  cookies().set(sessionCookieName, "", {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 0
-  });
+  return {
+    name: sessionCookieName,
+    value: "",
+    options: {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: 0
+    }
+  };
 }
 
 export async function getCurrentUser(request?: Request) {
@@ -175,16 +208,16 @@ export async function signUpWithPassword(input: { name: string; email: string; p
     return createdUser;
   });
 
-  await createUserSession(user.id);
-  return user;
+  const session = await createUserSession(user.id);
+  return { user, session };
 }
 
 export async function signInWithPassword(input: { email: string; password: string }) {
   const user = await prisma.user.findUnique({ where: { email: normalizeEmail(input.email) } });
   if (!user || !verifyPassword(input.password, user.passwordHash)) throw new Error("INVALID_CREDENTIALS");
 
-  await createUserSession(user.id);
-  return user;
+  const session = await createUserSession(user.id);
+  return { user, session };
 }
 
 export function isAuthError(error: unknown) {
