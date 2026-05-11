@@ -27,8 +27,10 @@ function logSignupFailure(error: unknown) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    await signUpWithPassword(body);
-    return NextResponse.json({ ok: true }, { status: 201, headers: { "Cache-Control": "no-store" } });
+    const { session } = await signUpWithPassword(body);
+    const response = NextResponse.json({ ok: true }, { status: 201, headers: { "Cache-Control": "no-store" } });
+    response.cookies.set(session.name, session.value, session.options);
+    return response;
   } catch (error) {
     logSignupFailure(error);
 

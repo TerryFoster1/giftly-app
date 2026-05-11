@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { clearUserSession } from "@/lib/auth";
 
 export async function GET(request: Request) {
-  await clearUserSession();
-  return NextResponse.redirect(new URL("/", request.url));
+  const cookie = await clearUserSession();
+  const response = NextResponse.redirect(new URL("/", request.url));
+  response.cookies.set(cookie.name, cookie.value, cookie.options);
+  return response;
 }
