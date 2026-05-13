@@ -50,6 +50,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
     }
 
     setLoading(true);
+<<<<<<< Updated upstream
 
     const response = await fetch(`/api/auth/${mode}`, {
       method: "POST",
@@ -73,6 +74,8 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
     const body = await response.json().catch(() => ({ message: "Something went wrong." }));
     setError(body.message);
     setLoading(false);
+=======
+>>>>>>> Stashed changes
   }
 
   return (
