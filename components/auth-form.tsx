@@ -2,11 +2,24 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Check, Eye, EyeOff } from "lucide-react";
 import { Button, Field, Input } from "./ui";
 
+const errorMessages: Record<string, string> = {
+  invalid: "Invalid email or password.",
+  taken: "That email may already be in use.",
+  weak: "Use a valid email and a password of at least 8 characters.",
+  config: "Signup is temporarily unavailable. Please try again soon.",
+  other: "Something went wrong. Please try again."
+};
+
 export function AuthForm({ mode }: { mode: "login" | "signup" }) {
-  const [error, setError] = useState("");
+  const searchParams = useSearchParams();
+  const initialErrorCode = searchParams?.get("error") ?? "";
+  const initialErrorMessage = errorMessages[initialErrorCode] ?? "";
+
+  const [error, setError] = useState(initialErrorMessage);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -31,25 +44,29 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
     );
   }
 
-  async function submit(event: React.FormEvent) {
-    event.preventDefault();
-    setError("");
-
+  function submit(event: React.FormEvent<HTMLFormElement>) {
     if (mode === "signup") {
       if (!form.password || !form.confirmPassword || !passwordChecks.length) {
+        event.preventDefault();
         setError("Password must be at least 8 characters.");
         return;
       }
 
       if (!passwordChecks.match) {
+        event.preventDefault();
         setError("Passwords do not match.");
         return;
       }
 
-      if (!signupPasswordIsValid) return;
+      if (!signupPasswordIsValid) {
+        event.preventDefault();
+        return;
+      }
     }
 
+    setError("");
     setLoading(true);
+<<<<<<< Updated upstream
 
     const response = await fetch(`/api/auth/${mode}`, {
       method: "POST",
@@ -73,27 +90,36 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
     const body = await response.json().catch(() => ({ message: "Something went wrong." }));
     setError(body.message);
     setLoading(false);
+=======
+>>>>>>> Stashed changes
   }
 
   return (
-    <form onSubmit={submit} className="mx-auto grid w-full max-w-md gap-4 rounded-[2rem] border border-ink/10 bg-white p-5 shadow-soft">
+    <form
+      onSubmit={submit}
+      action={`/api/auth/${mode}`}
+      method="POST"
+      className="mx-auto grid w-full max-w-md gap-4 rounded-[2rem] border border-ink/10 bg-white p-5 shadow-soft"
+    >
       <div>
         <p className="text-sm font-black uppercase text-berry">{mode === "login" ? "Welcome back" : "Create account"}</p>
         <h1 className="text-3xl font-black">{mode === "login" ? "Log in to Giftly" : "Start Giftly"}</h1>
       </div>
       {mode === "signup" ? (
         <Field label="Name">
-          <Input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
+          <Input required name="name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
         </Field>
       ) : null}
       <Field label="Email">
-        <Input required type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
+        <Input required name="email" type="email" autoComplete="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
       </Field>
       <Field label="Password">
         <div className="grid gap-2">
           <div className="relative">
             <Input
               required
+              name="password"
+              autoComplete={mode === "signup" ? "new-password" : "current-password"}
               className="w-full pr-12"
               type={showPassword ? "text" : "password"}
               minLength={8}
@@ -120,6 +146,8 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
             <div className="relative">
               <Input
                 required
+                name="confirmPassword"
+                autoComplete="new-password"
                 className="w-full pr-12"
                 type={showConfirmPassword ? "text" : "password"}
                 minLength={8}

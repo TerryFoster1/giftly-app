@@ -24,28 +24,55 @@ function logSignupFailure(error: unknown) {
   console.error("[signup] Unknown signup failure", { error });
 }
 
+async function readSignupInput(request: Request) {
+  const contentType = request.headers.get("content-type") ?? "";
+  if (contentType.includes("application/json")) {
+    const body = await request.json();
+    return {
+      name: typeof body?.name === "string" ? body.name : "",
+      email: typeof body?.email === "string" ? body.email : "",
+      password: typeof body?.password === "string" ? body.password : ""
+    };
+  }
+  const formData = await request.formData();
+  return {
+    name: String(formData.get("name") ?? ""),
+    email: String(formData.get("email") ?? ""),
+    password: String(formData.get("password") ?? "")
+  };
+}
+
+function signupErrorRedirect(request: Request, code: string) {
+  const url = new URL("/signup", request.url);
+  url.searchParams.set("error", code);
+  const response = NextResponse.redirect(url, { status: 303 });
+  response.headers.set("Cache-Control", "no-store");
+  return response;
+}
+
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { session } = await signUpWithPassword(body);
-    const response = NextResponse.json({ ok: true }, { status: 201, headers: { "Cache-Control": "no-store" } });
+    const input = await readSignupInput(request);
+    const { session } = await signUpWithPassword(input);
+    const response = NextResponse.redirect(new URL("/profiles", request.url), { status: 303 });
     response.cookies.set(session.name, session.value, session.options);
+    response.headers.set("Cache-Control", "no-store");
     return response;
   } catch (error) {
     logSignupFailure(error);
 
     if (error instanceof Error && error.message === "INVALID_AUTH_INPUT") {
-      return NextResponse.json({ message: "Use a valid email and a password of at least 8 characters." }, { status: 400 });
+      return signupErrorRedirect(request, "weak");
     }
 
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      return NextResponse.json({ message: "That email may already be in use." }, { status: 409 });
+      return signupErrorRedirect(request, "taken");
     }
 
     if (error instanceof Error && ["DATABASE_URL_REQUIRED", "VERCEL_REQUIRES_POSTGRES_DATABASE_URL", "AUTH_SECRET_REQUIRED"].includes(error.message)) {
-      return NextResponse.json({ message: "Signup is temporarily unavailable while the server is being configured." }, { status: 500 });
+      return signupErrorRedirect(request, "config");
     }
 
-    return NextResponse.json({ message: "Signup is temporarily unavailable. Please try again soon." }, { status: 500 });
+    return signupErrorRedirect(request, "other");
   }
 }
