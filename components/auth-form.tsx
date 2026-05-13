@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Check, Eye, EyeOff } from "lucide-react";
 import { Button, Field, Input } from "./ui";
@@ -20,6 +20,12 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   };
   const signupPasswordIsValid = Object.values(passwordChecks).every(Boolean);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("error") === "invalid") setError("Invalid email or password.");
+    if (params.get("error") === "signup") setError("Signup is temporarily unavailable. Please try again soon.");
+  }, []);
+
   function Requirement({ met, children }: { met: boolean; children: React.ReactNode }) {
     return (
       <li className={`flex items-center gap-2 text-xs font-bold ${met ? "text-spruce" : "text-ink/50"}`}>
@@ -31,72 +37,56 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
     );
   }
 
-  async function submit(event: React.FormEvent) {
-    event.preventDefault();
+  function submit(event: React.FormEvent) {
     setError("");
 
     if (mode === "signup") {
       if (!form.password || !form.confirmPassword || !passwordChecks.length) {
+        event.preventDefault();
         setError("Password must be at least 8 characters.");
         return;
       }
 
       if (!passwordChecks.match) {
+        event.preventDefault();
         setError("Passwords do not match.");
         return;
       }
 
-      if (!signupPasswordIsValid) return;
+      if (!signupPasswordIsValid) {
+        event.preventDefault();
+        return;
+      }
     }
 
     setLoading(true);
-<<<<<<< Updated upstream
-
-    const response = await fetch(`/api/auth/${mode}`, {
-      method: "POST",
-      credentials: "include",
-      mode: "same-origin",
-      cache: "no-store",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: form.name,
-        email: form.email,
-        password: form.password
-      })
-    });
-
-    if (response.ok) {
-      await response.text().catch(() => null);
-      window.location.href = mode === "signup" ? "/profiles" : "/dashboard";
-      return;
-    }
-
-    const body = await response.json().catch(() => ({ message: "Something went wrong." }));
-    setError(body.message);
-    setLoading(false);
-=======
->>>>>>> Stashed changes
   }
 
   return (
-    <form onSubmit={submit} className="mx-auto grid w-full max-w-md gap-4 rounded-[2rem] border border-ink/10 bg-white p-5 shadow-soft">
+    <form
+      action={`/api/auth/${mode}`}
+      method="post"
+      onSubmit={submit}
+      className="mx-auto grid w-full max-w-md gap-4 rounded-[2rem] border border-ink/10 bg-white p-5 shadow-soft"
+    >
       <div>
         <p className="text-sm font-black uppercase text-berry">{mode === "login" ? "Welcome back" : "Create account"}</p>
         <h1 className="text-3xl font-black">{mode === "login" ? "Log in to Giftly" : "Start Giftly"}</h1>
       </div>
       {mode === "signup" ? (
         <Field label="Name">
-          <Input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
+          <Input name="name" required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
         </Field>
       ) : null}
       <Field label="Email">
-        <Input required type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
+        <Input name="email" required type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
       </Field>
       <Field label="Password">
         <div className="grid gap-2">
           <div className="relative">
             <Input
               required
+              name="password"
               className="w-full pr-12"
               type={showPassword ? "text" : "password"}
               minLength={8}

@@ -2,6 +2,24 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { signUpWithPassword } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+
+async function readAuthBody(request: Request) {
+  const contentType = request.headers.get("content-type") ?? "";
+  if (contentType.includes("application/json")) return request.json();
+
+  const formData = await request.formData();
+  return {
+    name: String(formData.get("name") ?? ""),
+    email: String(formData.get("email") ?? ""),
+    password: String(formData.get("password") ?? "")
+  };
+}
+
+function wantsJson(request: Request) {
+  return (request.headers.get("content-type") ?? "").includes("application/json");
+}
+
 function logSignupFailure(error: unknown) {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     console.error("[signup] Prisma known request error", {
@@ -26,13 +44,29 @@ function logSignupFailure(error: unknown) {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    const body = await readAuthBody(request);
     const { session } = await signUpWithPassword(body);
-    const response = NextResponse.json({ ok: true }, { status: 201, headers: { "Cache-Control": "no-store" } });
+    const response = wantsJson(request)
+      ? NextResponse.json({ ok: true }, { status: 201, headers: { "Cache-Control": "no-store" } })
+      : NextResponse.redirect(new URL("/profiles", request.url), 303);
     response.cookies.set(session.name, session.value, session.options);
+    console.info("[auth-debug] Setting session cookie", {
+      route: "signup",
+      name: session.name,
+      path: session.options.path,
+      secure: session.options.secure,
+      sameSite: session.options.sameSite,
+      responseType: wantsJson(request) ? "json" : "redirect"
+    });
     return response;
   } catch (error) {
     logSignupFailure(error);
+
+    if (!wantsJson(request)) {
+      const signupUrl = new URL("/signup", request.url);
+      signupUrl.searchParams.set("error", "signup");
+      return NextResponse.redirect(signupUrl, 303);
+    }
 
     if (error instanceof Error && error.message === "INVALID_AUTH_INPUT") {
       return NextResponse.json({ message: "Use a valid email and a password of at least 8 characters." }, { status: 400 });
