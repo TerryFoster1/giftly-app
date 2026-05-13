@@ -66,8 +66,11 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
 
     if (response.ok) {
       await response.text().catch(() => null);
-      window.location.href = mode === "signup" ? "/profiles" : "/dashboard";
-      return;
+     setTimeout(() => {
+setTimeout(() => {
+  window.location.href = mode === "signup" ? "/profiles" : "/dashboard";
+}, 500);
+}, 500);
     }
 
     const body = await response.json().catch(() => ({ message: "Something went wrong." }));
