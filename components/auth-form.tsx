@@ -65,6 +65,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
     });
 
     if (response.ok) {
+      await response.text().catch(() => null);
       window.location.href = mode === "signup" ? "/profiles" : "/dashboard";
       return;
     }
