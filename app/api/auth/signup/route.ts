@@ -21,6 +21,17 @@ function wantsJson(request: Request) {
   return (request.headers.get("content-type") ?? "").includes("application/json");
 }
 
+function redirectWithSessionCookie(url: URL, cookie: string) {
+  return new Response(null, {
+    status: 303,
+    headers: {
+      Location: url.toString(),
+      "Set-Cookie": cookie,
+      "Cache-Control": "no-store"
+    }
+  });
+}
+
 function logSignupFailure(error: unknown) {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     console.error("[signup] Prisma known request error", {
@@ -47,10 +58,10 @@ export async function POST(request: Request) {
   try {
     const body = await readAuthBody(request);
     const { session } = await signUpWithPassword(body);
+    const cookie = serializeSessionCookie(session);
     const response = wantsJson(request)
-      ? NextResponse.json({ ok: true }, { status: 201, headers: { "Cache-Control": "no-store" } })
-      : NextResponse.redirect(new URL("/profiles", request.url), 303);
-    response.headers.append("Set-Cookie", serializeSessionCookie(session));
+      ? NextResponse.json({ ok: true }, { status: 201, headers: { "Cache-Control": "no-store", "Set-Cookie": cookie } })
+      : redirectWithSessionCookie(new URL("/profiles", request.url), cookie);
     console.info("[auth-debug] Setting session cookie", {
       route: "signup",
       runtime: process.env.NEXT_RUNTIME ?? "nodejs",
@@ -67,7 +78,13 @@ export async function POST(request: Request) {
     if (!wantsJson(request)) {
       const signupUrl = new URL("/signup", request.url);
       signupUrl.searchParams.set("error", "signup");
-      return NextResponse.redirect(signupUrl, 303);
+      return new Response(null, {
+        status: 303,
+        headers: {
+          Location: signupUrl.toString(),
+          "Cache-Control": "no-store"
+        }
+      });
     }
 
     if (error instanceof Error && error.message === "INVALID_AUTH_INPUT") {

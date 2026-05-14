@@ -19,14 +19,25 @@ function wantsJson(request: Request) {
   return (request.headers.get("content-type") ?? "").includes("application/json");
 }
 
+function redirectWithSessionCookie(url: URL, cookie: string) {
+  return new Response(null, {
+    status: 303,
+    headers: {
+      Location: url.toString(),
+      "Set-Cookie": cookie,
+      "Cache-Control": "no-store"
+    }
+  });
+}
+
 export async function POST(request: Request) {
   try {
     const body = await readAuthBody(request);
     const { session } = await signInWithPassword(body);
+    const cookie = serializeSessionCookie(session);
     const response = wantsJson(request)
-      ? NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store" } })
-      : NextResponse.redirect(new URL("/dashboard", request.url), 303);
-    response.headers.append("Set-Cookie", serializeSessionCookie(session));
+      ? NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store", "Set-Cookie": cookie } })
+      : redirectWithSessionCookie(new URL("/dashboard", request.url), cookie);
     console.info("[auth-debug] Setting session cookie", {
       route: "login",
       runtime: process.env.NEXT_RUNTIME ?? "nodejs",
@@ -44,6 +55,12 @@ export async function POST(request: Request) {
 
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("error", "invalid");
-    return NextResponse.redirect(loginUrl, 303);
+    return new Response(null, {
+      status: 303,
+      headers: {
+        Location: loginUrl.toString(),
+        "Cache-Control": "no-store"
+      }
+    });
   }
 }
