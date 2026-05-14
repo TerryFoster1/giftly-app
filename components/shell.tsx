@@ -19,7 +19,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
               Profiles
             </Link>
             {user ? (
-              <Link className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold hover:bg-white" href="/logout">
+              <Link className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold hover:bg-white" href="/logout" prefetch={false}>
                 <LogOut size={16} />
                 Logout
               </Link>

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ExternalLink, LinkIcon, Plus, Share2, Sparkles, X } from "lucide-react";
+import { Plus, Share2, Sparkles, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useGiftlyStore } from "@/lib/store";
 import { getUpcomingProfileEvents } from "@/lib/events";
@@ -69,6 +69,7 @@ export function DashboardClient({ initialSlug }: { initialSlug?: string }) {
 
   const primaryProfile = profiles.find((profile) => profile.isPrimary) ?? profiles[0];
   const upcomingEvents = useMemo(() => getUpcomingProfileEvents(profiles).slice(0, 3), [profiles]);
+  const isListDetail = Boolean(initialSlug);
 
   const visibleGifts = useMemo(() => {
     if (!selectedProfile) return [];
@@ -157,7 +158,7 @@ export function DashboardClient({ initialSlug }: { initialSlug?: string }) {
       const stamp = new Date().toISOString();
       const productUrl = metadata.canonicalUrl || normalized.url;
       const price = priceAmount(metadata.price);
-      await saveGift({
+      const savedGift: GiftItem = {
         id: `gift_${crypto.randomUUID()}`,
         profileId: targetProfile.id,
         createdByUserId: user?.id ?? "current_user",
@@ -186,7 +187,9 @@ export function DashboardClient({ initialSlug }: { initialSlug?: string }) {
         purchasedStatus: false,
         createdAt: stamp,
         updatedAt: stamp
-      });
+      };
+      await actions.saveGift(savedGift);
+      await actions.refresh();
       setSelectedProfileId(targetProfile.id);
       setFastModalOpen(false);
       setCreateNewList(false);
@@ -242,7 +245,7 @@ export function DashboardClient({ initialSlug }: { initialSlug?: string }) {
           <p className="text-sm font-black uppercase text-berry">Gift notepad</p>
           <h1 className="text-3xl font-black leading-tight sm:text-5xl">Save the gift idea before it disappears.</h1>
           <p className="max-w-2xl text-sm font-semibold leading-6 text-ink/65 sm:text-base">
-            Paste any product link, drop it into the right wishlist, and keep a year-round catalogue of things people actually want.
+            Paste any product link, drop it into the right wishlist, and keep a simple place for gift inspiration all year.
           </p>
         </div>
         <div className="grid gap-3 rounded-3xl bg-cloud p-3 sm:grid-cols-[1fr_auto]">
@@ -264,10 +267,6 @@ export function DashboardClient({ initialSlug }: { initialSlug?: string }) {
             <Share2 size={16} />
             Share your Giftly profile
           </Button>
-          <Button type="button" variant="ghost" onClick={() => { setEditing(null); setShowForm(true); }}>
-            <LinkIcon size={16} />
-            Manual entry
-          </Button>
         </div>
       </section>
 
@@ -278,7 +277,7 @@ export function DashboardClient({ initialSlug }: { initialSlug?: string }) {
         <div className="flex items-end justify-between gap-3">
           <div>
             <p className="text-sm font-black uppercase text-berry">My Wishlists</p>
-            <h2 className="text-2xl font-black">Sears Catalogue mode</h2>
+            <h2 className="text-2xl font-black">Saved gift ideas</h2>
           </div>
           <Link className="text-sm font-black text-spruce underline" href="/profiles">
             Manage
@@ -324,7 +323,7 @@ export function DashboardClient({ initialSlug }: { initialSlug?: string }) {
           <h2 className="text-xl font-black">Recommended gifts</h2>
         </div>
         <p className="text-sm font-semibold leading-6 text-ink/60">
-          Placeholder for future suggestions based on events, saved products, and gift history. No affiliate matching or shopping automation yet.
+          Future recommendations can help surface thoughtful gift ideas from saved inspiration, events, and shared wishlists.
         </p>
       </section>
 
@@ -347,6 +346,7 @@ export function DashboardClient({ initialSlug }: { initialSlug?: string }) {
         </section>
       ) : null}
 
+      {isListDetail ? (
       <section className="grid gap-5">
         <div className="rounded-[2rem] border border-ink/10 bg-white p-4 shadow-soft">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -409,6 +409,7 @@ export function DashboardClient({ initialSlug }: { initialSlug?: string }) {
           </div>
         )}
       </section>
+      ) : null}
 
       {fastModalOpen ? (
         <div className="fixed inset-0 z-40 grid place-items-end bg-ink/40 p-0 sm:place-items-center sm:p-4">

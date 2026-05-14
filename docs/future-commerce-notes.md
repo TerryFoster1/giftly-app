@@ -1,6 +1,6 @@
 # Giftly Commerce Prep Notes
 
-Phase 1 keeps Giftly as a gift notepad and wishlist catalogue. These notes mark future product surfaces without building payments, carts, or affiliate automation yet.
+Phase 1 keeps Giftly as a gift notepad and shared wishlist planner. These notes mark future product surfaces without building payments, carts, or affiliate automation yet.
 
 ## Affiliate URL Replacement
 
