@@ -78,11 +78,12 @@ export type SessionCookieClear = {
 };
 
 export function serializeSessionCookie(cookie: SessionCookieAttachment | SessionCookieClear) {
+  const sameSite = cookie.options.sameSite === "lax" ? "Lax" : cookie.options.sameSite;
   const parts = [
     `${cookie.name}=${encodeURIComponent(cookie.value)}`,
     `Path=${cookie.options.path}`,
     `Max-Age=${cookie.options.maxAge}`,
-    `SameSite=${cookie.options.sameSite}`,
+    `SameSite=${sameSite}`,
     "HttpOnly"
   ];
 
