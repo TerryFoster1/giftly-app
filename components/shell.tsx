@@ -10,7 +10,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen pb-24 md:pb-0">
       <header className="sticky top-0 z-20 border-b border-ink/10 bg-blush/85 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-          <Brand />
+          <Brand href={user ? "/dashboard" : "/"} />
           <nav className="hidden items-center gap-2 md:flex">
             <Link className="rounded-full px-4 py-2 text-sm font-bold hover:bg-white" href="/dashboard">
               Dashboard

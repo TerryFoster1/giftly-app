@@ -400,6 +400,22 @@ export async function deleteGift(user: User, id: string) {
   await prisma.giftItem.delete({ where: { id } });
 }
 
+export async function getOwnedGiftDetail(user: User, id: string) {
+  const gift = await prisma.giftItem.findFirst({
+    where: {
+      id,
+      profile: { ownerUserId: user.id }
+    },
+    include: { profile: true }
+  });
+  if (!gift) return null;
+
+  return {
+    gift: toGift(gift),
+    profile: toProfile(gift.profile)
+  };
+}
+
 export async function deleteProfile(user: User, profileId: string) {
   if (!(await ownsProfile(user.id, profileId))) throw new Error("FORBIDDEN");
   await prisma.profile.delete({ where: { id: profileId } });

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Check, Edit3, ExternalLink, Lock, Trash2 } from "lucide-react";
 import type { GiftItem } from "@/lib/types";
 import { Button, Hearts } from "./ui";
@@ -91,6 +92,9 @@ export function GiftCard({
             </>
           ) : (
             <>
+              <Link className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-ink/10 bg-white px-4 py-2 text-sm font-extrabold text-ink hover:bg-blush" href={`/gifts/${gift.id}`}>
+                Details
+              </Link>
               <Button type="button" variant="ghost" onClick={() => onEdit?.(gift)}>
                 <Edit3 size={16} />
                 Edit
