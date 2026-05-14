@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
-import { signUpWithPassword } from "@/lib/auth";
+import { describeSessionCookie, serializeSessionCookie, signUpWithPassword } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 async function readAuthBody(request: Request) {
   const contentType = request.headers.get("content-type") ?? "";
@@ -49,14 +50,15 @@ export async function POST(request: Request) {
     const response = wantsJson(request)
       ? NextResponse.json({ ok: true }, { status: 201, headers: { "Cache-Control": "no-store" } })
       : NextResponse.redirect(new URL("/profiles", request.url), 303);
-    response.cookies.set(session.name, session.value, session.options);
+    response.headers.append("Set-Cookie", serializeSessionCookie(session));
     console.info("[auth-debug] Setting session cookie", {
       route: "signup",
-      name: session.name,
-      path: session.options.path,
-      secure: session.options.secure,
-      sameSite: session.options.sameSite,
-      responseType: wantsJson(request) ? "json" : "redirect"
+      runtime: process.env.NEXT_RUNTIME ?? "nodejs",
+      responseType: wantsJson(request) ? "json" : "redirect",
+      status: response.status,
+      hasSetCookieHeader: response.headers.has("set-cookie"),
+      responseHeaderNames: Array.from(response.headers.keys()),
+      cookie: describeSessionCookie(session)
     });
     return response;
   } catch (error) {

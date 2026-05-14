@@ -77,6 +77,33 @@ export type SessionCookieClear = {
   };
 };
 
+export function serializeSessionCookie(cookie: SessionCookieAttachment | SessionCookieClear) {
+  const parts = [
+    `${cookie.name}=${encodeURIComponent(cookie.value)}`,
+    `Path=${cookie.options.path}`,
+    `Max-Age=${cookie.options.maxAge}`,
+    `SameSite=${cookie.options.sameSite}`,
+    "HttpOnly"
+  ];
+
+  if ("expires" in cookie.options) parts.push(`Expires=${cookie.options.expires.toUTCString()}`);
+  if (cookie.options.secure) parts.push("Secure");
+
+  return parts.join("; ");
+}
+
+export function describeSessionCookie(cookie: SessionCookieAttachment | SessionCookieClear) {
+  return {
+    name: cookie.name,
+    path: cookie.options.path,
+    maxAge: cookie.options.maxAge,
+    sameSite: cookie.options.sameSite,
+    secure: cookie.options.secure,
+    httpOnly: cookie.options.httpOnly,
+    hasExpires: "expires" in cookie.options
+  };
+}
+
 export async function createUserSession(userId: string): Promise<SessionCookieAttachment> {
   const token = randomBytes(32).toString("base64url");
   const expiresAt = new Date(Date.now() + sessionDays * 24 * 60 * 60 * 1000);
