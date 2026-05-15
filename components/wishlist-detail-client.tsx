@@ -60,6 +60,7 @@ export function WishlistDetailClient({ slug }: { slug: string }) {
       reserved: profileGifts.filter((gift) => gift.reservedStatus === "reserved").length
     };
   }, [gifts, selectedProfile]);
+  const displayFirstName = selectedProfile?.displayName.split(" ")[0] ?? "Their";
   const visibleGifts = useMemo(() => {
     if (!selectedProfile) return [];
     return gifts
@@ -197,23 +198,25 @@ export function WishlistDetailClient({ slug }: { slug: string }) {
   }
 
   return (
-    <main className="mx-auto grid max-w-6xl gap-5 px-4 py-5">
-      <section className="grid gap-4 rounded-[2rem] border border-ink/10 bg-white p-4 shadow-soft sm:p-5">
+    <main className="mx-auto grid max-w-6xl gap-4 px-4 py-5">
+      <section className="grid gap-4 rounded-[2rem] border border-ink/10 bg-white p-4 shadow-sm sm:p-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <Link className="text-sm font-black text-spruce underline" href="/dashboard">
               Back to dashboard
             </Link>
-            <p className="mt-4 text-xs font-black uppercase tracking-[0.12em] text-berry">Curated wishlist</p>
-            <h1 className="mt-1 text-3xl font-black leading-tight sm:text-5xl">{selectedProfile.displayName}</h1>
+            <p className="mt-4 text-xs font-black uppercase tracking-[0.12em] text-berry">
+              {selectedProfile.isManagedProfile ? "Gift ideas for" : "Personal gift list"}
+            </p>
+            <h1 className="mt-1 text-3xl font-black leading-tight sm:text-5xl">{displayFirstName}'s Gift Ideas</h1>
             <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-ink/60">
-              {selectedProfile.bio || "A thoughtful board of gift ideas, saved for the moments when someone asks what would feel special."}
+              {selectedProfile.bio || `A thoughtful place to save what ${displayFirstName} might love, ready to share with family and friends when gift season sneaks up.`}
             </p>
             <div className="mt-3 flex flex-wrap gap-2 text-xs font-black text-ink/55">
               <span className="rounded-full bg-cloud px-3 py-1">{wishlistStats.total} {wishlistStats.total === 1 ? "idea" : "ideas"}</span>
-              <span className="rounded-full bg-blush px-3 py-1 text-berry">{wishlistStats.shared} shareable</span>
+              <span className="rounded-full bg-blush px-3 py-1 text-berry">Shared with family & friends</span>
+              <span className="rounded-full bg-cloud px-3 py-1">{wishlistStats.shared} shareable</span>
               <span className="rounded-full bg-mint px-3 py-1 text-spruce">{wishlistStats.reserved} planned</span>
-              <span className="rounded-full bg-cloud px-3 py-1">{selectedProfile.isManagedProfile ? "Managed wishlist" : "Personal wishlist"}</span>
             </div>
           </div>
           <div className="flex flex-col gap-2 sm:items-end">
@@ -227,7 +230,7 @@ export function WishlistDetailClient({ slug }: { slug: string }) {
             </Button>
           </div>
         </div>
-        <div className="grid gap-3 rounded-3xl bg-cloud p-2.5 sm:grid-cols-[1fr_auto]">
+        <div className="grid gap-3 rounded-[1.5rem] bg-cloud p-2.5 sm:grid-cols-[1fr_auto]">
           <Input aria-label="Product link" placeholder="Paste a product link" type="text" value={fastUrl} onChange={(event) => setFastUrl(event.target.value)} />
           <Button type="button" className="min-h-10" onClick={openFastAdd}>
             <Plus size={16} />
@@ -241,15 +244,15 @@ export function WishlistDetailClient({ slug }: { slug: string }) {
       {actionError ? <p className="rounded-2xl bg-blush p-3 text-sm font-bold text-berry">{actionError}</p> : null}
 
       <section className="grid gap-4">
-        <div className="grid gap-2 rounded-[1.5rem] border border-ink/10 bg-white/80 p-2.5 shadow-sm sm:grid-cols-[1fr_1fr_auto]">
-          <label className="grid gap-1 text-xs font-black uppercase tracking-[0.08em] text-ink/45">
+        <div className="grid gap-2 rounded-[1.25rem] bg-white/55 p-2 sm:grid-cols-[1fr_1fr_auto]">
+          <label className="grid gap-1 text-[0.65rem] font-black uppercase tracking-[0.08em] text-ink/40">
             Occasion
             <Select value={eventFilter} onChange={(event) => setEventFilter(event.target.value)}>
               <option>All events</option>
               {eventTags.map((tag) => <option key={tag}>{tag}</option>)}
             </Select>
           </label>
-          <label className="grid gap-1 text-xs font-black uppercase tracking-[0.08em] text-ink/45">
+          <label className="grid gap-1 text-[0.65rem] font-black uppercase tracking-[0.08em] text-ink/40">
             Sharing
             <Select value={visibilityFilter} onChange={(event) => setVisibilityFilter(event.target.value as Visibility | "All")}>
               <option>All visibility</option>
@@ -258,7 +261,7 @@ export function WishlistDetailClient({ slug }: { slug: string }) {
               <option value="public">Public</option>
             </Select>
           </label>
-          <label className="grid gap-1 text-xs font-black uppercase tracking-[0.08em] text-ink/45">
+          <label className="grid gap-1 text-[0.65rem] font-black uppercase tracking-[0.08em] text-ink/40">
             Sort
             <Select value={sort} onChange={(event) => setSort(event.target.value)}>
               <option value="newest">Newest</option>
@@ -278,7 +281,7 @@ export function WishlistDetailClient({ slug }: { slug: string }) {
         ) : null}
 
         {visibleGifts.length ? (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
             {visibleGifts.map((gift) => (
               <GiftCard
                 key={gift.id}

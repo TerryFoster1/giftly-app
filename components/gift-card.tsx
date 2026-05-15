@@ -28,17 +28,18 @@ export function GiftCard({
 }: GiftCardProps) {
   const progress = gift.fundingGoalAmount ? Math.min(100, (gift.currentContributionAmount / gift.fundingGoalAmount) * 100) : 0;
   const priceLabel = gift.currency ? `${gift.currency} $${gift.price.toFixed(2)}` : gift.price ? gift.price.toFixed(2) : "Price not saved";
+  const metaLabel = [gift.storeName, priceLabel].filter(Boolean).join(" / ");
   const detailPath = `/gifts/${gift.id}`;
   const image = (
-    <div className="aspect-[5/4] bg-cloud">
+    <div className="aspect-[6/4] bg-cloud">
       <img src={gift.imageUrl} alt="" className="h-full w-full object-cover" />
     </div>
   );
 
   return (
-    <article className="group overflow-hidden rounded-[1.25rem] border border-ink/10 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft">
+    <article className="group overflow-hidden rounded-[1.15rem] border border-ink/10 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft">
       {publicMode ? image : <Link className="block" href={detailPath}>{image}</Link>}
-      <div className="grid gap-2.5 p-3.5">
+      <div className="grid gap-2 p-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="text-[0.68rem] font-black uppercase tracking-[0.08em] text-berry">{gift.eventTag}</p>
@@ -49,9 +50,7 @@ export function GiftCard({
                 {gift.title}
               </Link>
             )}
-            <p className="mt-1 text-xs font-bold text-ink/55">
-              {[gift.storeName, priceLabel].filter(Boolean).join(" · ")}
-            </p>
+            <p className="mt-1 text-xs font-bold text-ink/55">{metaLabel}</p>
           </div>
           <Hearts value={gift.wantRating} />
         </div>
@@ -69,13 +68,13 @@ export function GiftCard({
             {gift.purchasedStatus ? <span className="rounded-full bg-honey/40 px-2 py-0.5">purchased</span> : null}
           </div>
         ) : (
-          <p className="rounded-2xl bg-cloud p-2.5 text-xs font-bold text-ink/65">
+          <p className="rounded-2xl bg-cloud p-2 text-xs font-bold text-ink/65">
             {gift.reservedStatus === "reserved" ? "This gift is already reserved." : "Available to reserve."}
           </p>
         )}
 
         {gift.allowContributions ? (
-          <div className="rounded-2xl bg-mint/70 p-2.5">
+          <div className="rounded-2xl bg-mint/70 p-2">
             <div className="flex justify-between text-xs font-black text-spruce">
               <span>Gift pool</span>
               <span>
@@ -126,7 +125,7 @@ export function GiftCard({
             </>
           ) : (
             <>
-              <Link className="focus-ring inline-flex min-h-10 items-center justify-center gap-2 rounded-2xl bg-coral px-3 py-2 text-sm font-extrabold text-white hover:bg-berry" href={detailPath}>
+              <Link className="focus-ring inline-flex min-h-9 items-center justify-center gap-2 rounded-2xl bg-coral px-3 py-2 text-sm font-extrabold text-white hover:bg-berry" href={detailPath}>
                 View
               </Link>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs font-black text-ink/55">
