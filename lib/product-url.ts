@@ -21,10 +21,21 @@ export function normalizeProductUrl(input: string) {
 
 export function isAmazonUrl(input: string) {
   try {
-    return /(^|\.)amazon\./i.test(new URL(input).hostname);
+    const hostname = new URL(input).hostname.toLowerCase();
+    return /(^|\.)amazon\.(com|ca|co\.uk|de|fr|it|es|co\.jp|com\.au|com\.br|com\.mx|nl|se|pl|sg|ae|sa|in|com\.tr|eg|cn)$/i.test(hostname);
   } catch {
     return false;
   }
+}
+
+function extractAmazonAsin(url: URL) {
+  const pathMatch = url.pathname.match(/\/(?:[^/]+\/)?(?:dp|gp\/product|exec\/obidos\/ASIN)\/([A-Z0-9]{10})(?:[/?]|$)/i);
+  if (pathMatch?.[1]) return pathMatch[1].toUpperCase();
+
+  const queryAsin = url.searchParams.get("asin") || url.searchParams.get("ASIN");
+  if (queryAsin && /^[A-Z0-9]{10}$/i.test(queryAsin)) return queryAsin.toUpperCase();
+
+  return "";
 }
 
 export function normalizeAmazonProductUrl(input: string) {
@@ -33,9 +44,9 @@ export function normalizeAmazonProductUrl(input: string) {
 
   try {
     const url = new URL(normalized.url);
-    const asinFromPath = url.pathname.match(/\/(?:dp|gp\/product|exec\/obidos\/ASIN)\/([A-Z0-9]{10})(?:[/?]|$)/i)?.[1];
-    if (asinFromPath) {
-      url.pathname = `/dp/${asinFromPath.toUpperCase()}`;
+    const asin = extractAmazonAsin(url);
+    if (asin) {
+      url.pathname = `/dp/${asin}`;
     }
 
     for (const key of Array.from(url.searchParams.keys())) {

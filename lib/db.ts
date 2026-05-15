@@ -1,7 +1,8 @@
 import { EventTag as DbEventTag, GroupLabel as DbGroupLabel, Prisma } from "@prisma/client";
 import { randomUUID } from "crypto";
+import { createAmazonAffiliateUrl, shouldPreserveManualAffiliateUrl } from "./affiliate";
 import { userHasAdminAccess } from "./auth";
-import { normalizeAmazonProductUrl } from "./product-url";
+import { isAmazonUrl, normalizeAmazonProductUrl } from "./product-url";
 import { prisma } from "./prisma";
 import type { AdminOverview, AffiliateProgram, Connection, EventTag, GiftItem, GroupLabel, Profile, RecommendedProduct, Reservation, User } from "./types";
 
@@ -278,29 +279,6 @@ function normalizeRecommendedProductInput(input: Partial<RecommendedProduct>, us
   };
 }
 
-function isAmazonUrl(value?: string | null) {
-  if (!value) return false;
-  try {
-    const hostname = new URL(value).hostname.toLowerCase();
-    return hostname === "amazon.com" || hostname.endsWith(".amazon.com") || hostname.startsWith("amazon.");
-  } catch {
-    return false;
-  }
-}
-
-function amazonAffiliateUrl(productUrl: string, trackingTag: string) {
-  const tag = trackingTag.trim();
-  if (!tag || !isAmazonUrl(productUrl)) return "";
-  try {
-    const normalized = normalizeAmazonProductUrl(productUrl);
-    const url = new URL(normalized.url || productUrl);
-    url.searchParams.set("tag", tag);
-    return url.toString();
-  } catch {
-    return "";
-  }
-}
-
 async function getActiveAmazonTrackingTag() {
   const program = await prisma.affiliateProgram.findFirst({
     where: {
@@ -513,19 +491,20 @@ export async function upsertGift(user: User, gift: GiftItem) {
     throw new Error("FORBIDDEN");
   }
 
-  const normalizedAmazonUrl = isAmazonUrl(gift.productUrl || gift.originalUrl) ? normalizeAmazonProductUrl(gift.productUrl || gift.originalUrl).url : undefined;
+  const sourceUrl = gift.productUrl || gift.originalUrl;
+  const normalizedAmazonUrl = isAmazonUrl(sourceUrl) ? normalizeAmazonProductUrl(sourceUrl).url : undefined;
   const productUrl = normalizedAmazonUrl || gift.productUrl;
-  const originalUrl = normalizedAmazonUrl || gift.originalUrl;
-  const amazonTag = gift.affiliateUrl ? "" : await getActiveAmazonTrackingTag();
-  const generatedAffiliateUrl = amazonAffiliateUrl(productUrl || originalUrl, amazonTag);
+  const originalUrl = normalizedAmazonUrl || gift.originalUrl || productUrl;
+  const conversion = normalizedAmazonUrl ? createAmazonAffiliateUrl(normalizedAmazonUrl, await getActiveAmazonTrackingTag()) : null;
+  const affiliateUrl = conversion?.affiliateUrl || gift.affiliateUrl || undefined;
   const data = giftToDb(
     {
       ...gift,
       productUrl,
       originalUrl,
-      affiliateUrl: gift.affiliateUrl || generatedAffiliateUrl || undefined,
-      monetizedUrl: gift.affiliateUrl || generatedAffiliateUrl || gift.monetizedUrl || productUrl,
-      affiliateStatus: generatedAffiliateUrl ? "converted" : gift.affiliateStatus
+      affiliateUrl,
+      monetizedUrl: affiliateUrl || gift.monetizedUrl || productUrl,
+      affiliateStatus: conversion ? "converted" : gift.affiliateStatus
     },
     user.id
   );
@@ -681,10 +660,11 @@ export async function upsertRecommendedProduct(user: User, input: Partial<Recomm
   const data = normalizeRecommendedProductInput(input, user.id);
   const normalizedAmazonUrl = isAmazonUrl(data.originalUrl) ? normalizeAmazonProductUrl(data.originalUrl).url : undefined;
   if (normalizedAmazonUrl) data.originalUrl = normalizedAmazonUrl;
-  if (!data.affiliateUrl && isAmazonUrl(data.originalUrl)) {
-    const generated = amazonAffiliateUrl(data.originalUrl, await getActiveAmazonTrackingTag());
+  if (!shouldPreserveManualAffiliateUrl(data) && isAmazonUrl(data.originalUrl)) {
+    const generated = createAmazonAffiliateUrl(data.originalUrl, await getActiveAmazonTrackingTag());
     if (generated) {
-      data.affiliateUrl = generated;
+      data.originalUrl = generated.normalizedOriginalUrl;
+      data.affiliateUrl = generated.affiliateUrl;
       data.affiliateProgram = data.affiliateProgram || "Amazon Associates";
       data.affiliateStatus = "matched";
     }
@@ -880,17 +860,16 @@ export async function backfillAmazonAffiliateUrls(user: User) {
   for (const gift of gifts) {
     const sourceUrl = gift.originalUrl || gift.productUrl;
     if (!isAmazonUrl(sourceUrl)) continue;
-    const normalizedUrl = normalizeAmazonProductUrl(sourceUrl).url || sourceUrl;
-    const affiliateUrl = amazonAffiliateUrl(normalizedUrl, trackingTag);
-    if (!affiliateUrl) continue;
+    const conversion = createAmazonAffiliateUrl(sourceUrl, trackingTag);
+    if (!conversion) continue;
 
     await prisma.giftItem.update({
       where: { id: gift.id },
       data: {
-        productUrl: normalizedUrl,
-        originalUrl: normalizedUrl,
-        affiliateUrl,
-        monetizedUrl: affiliateUrl,
+        productUrl: conversion.normalizedOriginalUrl,
+        originalUrl: conversion.normalizedOriginalUrl,
+        affiliateUrl: conversion.affiliateUrl,
+        monetizedUrl: conversion.affiliateUrl,
         affiliateStatus: "converted"
       }
     });
@@ -900,15 +879,14 @@ export async function backfillAmazonAffiliateUrls(user: User) {
   for (const product of recommendedProducts) {
     const sourceUrl = product.originalUrl;
     if (!isAmazonUrl(sourceUrl)) continue;
-    const normalizedUrl = normalizeAmazonProductUrl(sourceUrl).url || sourceUrl;
-    const affiliateUrl = amazonAffiliateUrl(normalizedUrl, trackingTag);
-    if (!affiliateUrl) continue;
+    const conversion = createAmazonAffiliateUrl(sourceUrl, trackingTag);
+    if (!conversion) continue;
 
     await prisma.recommendedProduct.update({
       where: { id: product.id },
       data: {
-        originalUrl: normalizedUrl,
-        affiliateUrl,
+        originalUrl: conversion.normalizedOriginalUrl,
+        affiliateUrl: conversion.affiliateUrl,
         affiliateProgram: product.affiliateProgram || "Amazon Associates",
         affiliateStatus: "matched"
       }
