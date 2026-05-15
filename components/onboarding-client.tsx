@@ -1,22 +1,22 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Copy, Share2, Sparkles, UsersRound } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useGiftlyStore } from "@/lib/store";
-import type { GroupLabel } from "@/lib/types";
+import type { GiftEventType, GroupLabel } from "@/lib/types";
 import { publicProfileUrl } from "@/lib/url";
 import { Button, Field, Input, Select } from "./ui";
 
-type RelationshipKey = "partner" | "kids" | "parents" | "siblings" | "friends" | "coworkers" | "event";
+type RelationshipKey = "partner" | "kids" | "parents" | "siblings" | "friends" | "coworkers" | "wedding" | "baby";
 
 type PersonDraft = {
   id: string;
   type: RelationshipKey;
   name: string;
   contact: string;
-  birthday: string;
+  eventDate: string;
+  photoUrl: string;
 };
 
 const relationshipOptions: Array<{ value: RelationshipKey; label: string; groupLabel: GroupLabel; relationship: string; prompt: string }> = [
@@ -26,7 +26,8 @@ const relationshipOptions: Array<{ value: RelationshipKey; label: string; groupL
   { value: "siblings", label: "Siblings", groupLabel: "FAMILY", relationship: "Sibling", prompt: "Sibling's name" },
   { value: "friends", label: "Friends", groupLabel: "FRIENDS", relationship: "Friend", prompt: "Friend's name" },
   { value: "coworkers", label: "Coworkers", groupLabel: "CUSTOM", relationship: "Coworker", prompt: "Coworker's name" },
-  { value: "event", label: "Wedding/event", groupLabel: "CUSTOM", relationship: "Event", prompt: "Event or person name" }
+  { value: "wedding", label: "Wedding/event", groupLabel: "CUSTOM", relationship: "Event", prompt: "Wedding or event name" },
+  { value: "baby", label: "Baby shower", groupLabel: "CUSTOM", relationship: "Event", prompt: "Baby shower or family name" }
 ];
 
 function groupLabelFor(type: RelationshipKey) {
@@ -35,7 +36,8 @@ function groupLabelFor(type: RelationshipKey) {
 
 function customGroupFor(type: RelationshipKey) {
   if (type === "coworkers") return "Coworkers";
-  if (type === "event") return "Events";
+  if (type === "wedding") return "Events";
+  if (type === "baby") return "Baby showers";
   return undefined;
 }
 
@@ -47,13 +49,23 @@ function promptFor(type: RelationshipKey) {
   return relationshipOptions.find((option) => option.value === type)?.prompt ?? "Name";
 }
 
+function isEventType(type: RelationshipKey) {
+  return type === "wedding" || type === "baby";
+}
+
+function giftEventTypeFor(type: RelationshipKey): GiftEventType {
+  if (type === "wedding") return "WEDDING";
+  if (type === "baby") return "BABY_SHOWER";
+  return "BIRTHDAY";
+}
+
 export function OnboardingClient() {
   const router = useRouter();
   const { user, profiles, ready, actionError, actions } = useGiftlyStore();
   const [people, setPeople] = useState<PersonDraft[]>([
-    { id: crypto.randomUUID(), type: "partner", name: "", contact: "", birthday: "" },
-    { id: crypto.randomUUID(), type: "kids", name: "", contact: "", birthday: "" },
-    { id: crypto.randomUUID(), type: "friends", name: "", contact: "", birthday: "" }
+    { id: crypto.randomUUID(), type: "partner", name: "", contact: "", eventDate: "", photoUrl: "" },
+    { id: crypto.randomUUID(), type: "kids", name: "", contact: "", eventDate: "", photoUrl: "" },
+    { id: crypto.randomUUID(), type: "friends", name: "", contact: "", eventDate: "", photoUrl: "" }
   ]);
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
@@ -67,7 +79,7 @@ export function OnboardingClient() {
   }
 
   function addPerson(type: RelationshipKey) {
-    setPeople((current) => [...current, { id: crypto.randomUUID(), type, name: "", contact: "", birthday: "" }]);
+    setPeople((current) => [...current, { id: crypto.randomUUID(), type, name: "", contact: "", eventDate: "", photoUrl: "" }]);
   }
 
   function removePerson(id: string) {
@@ -103,13 +115,22 @@ export function OnboardingClient() {
         const groupLabel = groupLabelFor(person.type);
         const customGroupLabel = customGroupFor(person.type);
 
-        if (name) {
+        if (name && isEventType(person.type)) {
+          await actions.createEvent({
+            title: name,
+            eventType: giftEventTypeFor(person.type),
+            eventDate: person.eventDate,
+            groupLabel,
+            customGroupLabel,
+            notes: "Onboarding event placeholder for future reminders."
+          });
+        } else if (name) {
           await actions.createProfile({
             displayName: name,
             relationship: relationshipFor(person.type),
             bio: "",
-            photoUrl: "",
-            birthday: person.birthday,
+            photoUrl: person.photoUrl,
+            birthday: person.eventDate,
             anniversary: "",
             groupLabel,
             customGroupLabel,
@@ -126,6 +147,7 @@ export function OnboardingClient() {
         }
       }
 
+      await actions.completeOnboarding();
       await actions.refresh();
       window.localStorage.setItem("giftly_onboarding_dismissed", "true");
       router.push("/dashboard");
@@ -133,6 +155,15 @@ export function OnboardingClient() {
       setMessage(error instanceof Error ? error.message : "Onboarding could not be saved. You can skip and finish later.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function skipOnboarding() {
+    window.localStorage.setItem("giftly_onboarding_dismissed", "true");
+    try {
+      await actions.completeOnboarding();
+    } finally {
+      router.push("/dashboard");
     }
   }
 
@@ -171,11 +202,16 @@ export function OnboardingClient() {
                 <Field label="Email or phone">
                   <Input value={person.contact} onChange={(event) => updatePerson(person.id, { contact: event.target.value })} placeholder="Optional" />
                 </Field>
-                <Field label="Birthday/event date">
-                  <Input type="date" value={person.birthday} onChange={(event) => updatePerson(person.id, { birthday: event.target.value })} />
+                <Field label={isEventType(person.type) ? "Event date" : "Birthday"}>
+                  <Input type="date" value={person.eventDate} onChange={(event) => updatePerson(person.id, { eventDate: event.target.value })} />
                 </Field>
                 <Button type="button" variant="ghost" onClick={() => removePerson(person.id)}>Remove</Button>
               </div>
+              {!isEventType(person.type) ? (
+                <Field label="Photo URL optional">
+                  <Input value={person.photoUrl} onChange={(event) => updatePerson(person.id, { photoUrl: event.target.value })} placeholder="Leave blank for an initials avatar" />
+                </Field>
+              ) : null}
             </article>
           ))}
         </div>
@@ -228,13 +264,13 @@ export function OnboardingClient() {
         <Button type="button" onClick={finishOnboarding} disabled={saving}>
           {saving ? "Saving setup..." : "Save setup"}
         </Button>
-        <Link
+        <button
+          type="button"
           className="focus-ring inline-flex min-h-11 items-center justify-center rounded-2xl border border-ink/10 bg-white px-4 py-2 text-sm font-extrabold text-ink hover:bg-blush"
-          href="/dashboard"
-          onClick={() => window.localStorage.setItem("giftly_onboarding_dismissed", "true")}
+          onClick={skipOnboarding}
         >
           Skip for now
-        </Link>
+        </button>
       </div>
     </main>
   );

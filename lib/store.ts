@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { Connection, GiftItem, GroupLabel, Profile, Reservation, User } from "./types";
+import type { Connection, GiftEvent, GiftEventType, GiftItem, GroupLabel, Profile, Reservation, User } from "./types";
 
 type GiftlyStore = {
   user?: User;
@@ -9,6 +9,7 @@ type GiftlyStore = {
   gifts: GiftItem[];
   reservations: Reservation[];
   connections?: Connection[];
+  events?: GiftEvent[];
 };
 
 export class SessionExpiredError extends Error {
@@ -190,9 +191,27 @@ export function useGiftlyStore() {
               ...current,
               profiles: current.profiles.filter((profile) => profile.id !== id),
               gifts: current.gifts.filter((gift) => gift.profileId !== id),
-              reservations: current.reservations.filter((reservation) => !deletedGiftIds.has(reservation.giftItemId))
+              reservations: current.reservations.filter((reservation) => !deletedGiftIds.has(reservation.giftItemId)),
+              events: (current.events ?? []).filter((event) => event.profileId !== id)
             };
           });
+        });
+      },
+      async createEvent(input: { title: string; eventType?: GiftEventType; eventDate?: string; profileId?: string; groupLabel?: GroupLabel; customGroupLabel?: string; notes?: string }) {
+        return runAction(async () => {
+          const created = await requestJson<GiftEvent>("/api/events", {
+            method: "POST",
+            body: JSON.stringify(input)
+          });
+          setStore((current) => ({ ...current, events: [created, ...(current.events ?? [])] }));
+          return created;
+        });
+      },
+      async completeOnboarding() {
+        return runAction(async () => {
+          const updated = await requestJson<User>("/api/onboarding", { method: "POST" });
+          setStore((current) => ({ ...current, user: updated }));
+          return updated;
         });
       },
       async resetMyGiftlyData() {

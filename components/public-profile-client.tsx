@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Gift } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { eventTags, type GiftItem, type Profile } from "@/lib/types";
+import { Avatar } from "./avatar";
 import { Brand } from "./brand";
 import { GiftCard } from "./gift-card";
 import { Button, Field, Input, Select } from "./ui";
@@ -77,7 +78,7 @@ export function PublicProfileClient({ slug }: { slug: string }) {
       <section className="mx-auto grid max-w-5xl gap-5 px-4 pb-10">
         <div className="rounded-[2rem] border border-ink/10 bg-white p-5 shadow-soft">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-            <img src={profile.photoUrl || "https://images.unsplash.com/photo-1513201099705-a9746e1e201f?q=80&w=400&auto=format&fit=crop"} alt="" className="h-24 w-24 rounded-[2rem] object-cover" />
+            <Avatar name={profile.displayName} photoUrl={profile.photoUrl} className="h-24 w-24 rounded-[2rem]" />
             <div className="flex-1">
               <p className="text-sm font-black uppercase text-berry">Public wishlist</p>
               <h1 className="text-4xl font-black">{profile.displayName}</h1>

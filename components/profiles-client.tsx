@@ -7,6 +7,7 @@ import { useGiftlyStore } from "@/lib/store";
 import { formatEventDate } from "@/lib/events";
 import type { GroupLabel } from "@/lib/types";
 import { publicProfilePath, publicProfileUrl } from "@/lib/url";
+import { Avatar } from "./avatar";
 import { Button, Field, Input, Select, Textarea } from "./ui";
 import { QrCard } from "./qr-card";
 import { InviteModal } from "./invite-modal";
@@ -206,7 +207,7 @@ export function ProfilesClient() {
                   <Input value={form.relationship} onChange={(event) => setForm({ ...form, relationship: event.target.value })} />
                 </Field>
                 <Field label="Photo URL">
-                  <Input value={form.photoUrl} onChange={(event) => setForm({ ...form, photoUrl: event.target.value })} />
+                  <Input value={form.photoUrl} onChange={(event) => setForm({ ...form, photoUrl: event.target.value })} placeholder="Leave blank for initials avatar" />
                 </Field>
                 <Field label="Birthday">
                   <Input type="date" value={form.birthday} onChange={(event) => setForm({ ...form, birthday: event.target.value })} />
@@ -272,7 +273,7 @@ export function ProfilesClient() {
           {profiles.map((profile) => (
             <article className="rounded-[2rem] border border-ink/10 bg-white p-4 shadow-sm" key={profile.id}>
               <div className="flex gap-3">
-                <img src={profile.photoUrl || "https://images.unsplash.com/photo-1513201099705-a9746e1e201f?q=80&w=400&auto=format&fit=crop"} alt="" className="h-16 w-16 rounded-3xl object-cover" />
+                <Avatar name={profile.displayName} photoUrl={profile.photoUrl} />
                 <div>
                   <p className="text-xs font-black uppercase text-berry">{profile.relationship}</p>
                   <h2 className="text-xl font-black">{profile.displayName}</h2>

@@ -69,7 +69,7 @@ function isDemoGroupName(value: string) {
 }
 
 export function DashboardClient() {
-  const { user, profiles, gifts, connections = [], ready, actionError, actions } = useGiftlyStore();
+  const { user, profiles, gifts, connections = [], events = [], ready, actionError, actions } = useGiftlyStore();
   const [giftMessage, setGiftMessage] = useState("");
   const [fastUrl, setFastUrl] = useState("");
   const [fastError, setFastError] = useState("");
@@ -88,7 +88,8 @@ export function DashboardClient() {
   const [recommendedProducts, setRecommendedProducts] = useState<RecommendedProduct[]>([]);
 
   const primaryProfile = profiles.find((profile) => profile.isPrimary) ?? profiles[0];
-  const upcomingEvents = useMemo(() => getUpcomingProfileEvents(profiles).slice(0, 3), [profiles]);
+  const upcomingEvents = useMemo(() => getUpcomingProfileEvents(profiles, events).slice(0, 4), [profiles, events]);
+  const christmasGiftCount = gifts.filter((gift) => gift.eventTag === "Christmas" && !gift.purchasedStatus).length;
   const existingGroupNames = useMemo(
     () =>
       Array.from(
@@ -318,9 +319,11 @@ export function DashboardClient() {
 
       <OnboardingCard
         userName={user?.name}
+        onboardingCompleted={user?.onboardingCompleted}
         wishlistCount={profiles.length}
         onCreateWishlist={() => setCreateListOpen(true)}
         onInvite={() => openShareModal("existing")}
+        onComplete={() => actions.completeOnboarding()}
       />
 
       <section className="grid gap-3">
@@ -389,30 +392,39 @@ export function DashboardClient() {
         </div>
       </section>
 
-      {upcomingEvents.length ? (
-        <section className="rounded-[2rem] border border-ink/10 bg-white p-4 shadow-soft">
+      <section className="rounded-[2rem] border border-ink/10 bg-white p-4 shadow-soft">
           <div className="flex items-center gap-2">
             <CalendarDays size={18} className="text-berry" />
             <p className="text-sm font-black uppercase text-berry">Upcoming Events</p>
           </div>
           <div className="mt-3 grid gap-2">
-            {upcomingEvents.map((event) => (
+            {upcomingEvents.length ? upcomingEvents.map((event) => (
               <div className="flex items-center justify-between gap-3 rounded-2xl bg-cloud p-3" key={event.id}>
                 <p className="font-black">
-                  {event.profileName}'s {event.eventType}
+                  {event.title}
                   <span className="ml-2 text-sm font-bold text-ink/50">{event.dateLabel}</span>
                 </p>
                 <span className="rounded-full bg-mint px-3 py-1 text-xs font-black text-spruce">
-                  {event.daysUntil === 0 ? "today" : `in ${event.daysUntil} days`}
+                  {event.reminderText.replace(event.title, "").trim()}
                 </span>
               </div>
-            ))}
+            )) : (
+              <div className="rounded-2xl bg-cloud p-3">
+                <p className="font-black">Add birthdays and events</p>
+                <p className="mt-1 text-sm font-semibold text-ink/55">Giftly can help you plan before the gift rush starts.</p>
+              </div>
+            )}
+            <div className="rounded-2xl border border-dashed border-ink/10 bg-white p-3">
+              <p className="font-black">Christmas planning</p>
+              <p className="mt-1 text-sm font-semibold text-ink/55">
+                {christmasGiftCount || 3} gifts still needed for Christmas.
+              </p>
+            </div>
           </div>
           <p className="mt-3 text-xs font-bold leading-5 text-ink/55">
             Giftly will later include events from shared gift groups and connected people.
           </p>
-        </section>
-      ) : null}
+      </section>
 
       <section className="grid gap-3">
         <div>

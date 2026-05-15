@@ -7,23 +7,26 @@ import { Button } from "./ui";
 
 type OnboardingCardProps = {
   userName?: string;
+  onboardingCompleted?: boolean;
   wishlistCount: number;
   onCreateWishlist: () => void;
   onInvite: () => void;
+  onComplete: () => void | Promise<unknown>;
 };
 
 const storageKey = "giftly_onboarding_dismissed";
 
-export function OnboardingCard({ userName, wishlistCount, onCreateWishlist, onInvite }: OnboardingCardProps) {
+export function OnboardingCard({ userName, onboardingCompleted, wishlistCount, onCreateWishlist, onInvite, onComplete }: OnboardingCardProps) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    setVisible(window.localStorage.getItem(storageKey) !== "true");
-  }, []);
+    setVisible(!onboardingCompleted && window.localStorage.getItem(storageKey) !== "true");
+  }, [onboardingCompleted]);
 
   function skip() {
     window.localStorage.setItem(storageKey, "true");
     setVisible(false);
+    void onComplete();
   }
 
   if (!visible) return null;

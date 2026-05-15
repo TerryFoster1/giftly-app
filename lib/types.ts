@@ -12,6 +12,7 @@ export type ReservationStatus = "available" | "reserved";
 export type GroupLabel = "FAMILY" | "FRIENDS" | "PARTNER" | "GUESTS" | "CUSTOM";
 export type ConnectionStatus = "PENDING" | "ACCEPTED" | "REJECTED";
 export type PrimaryEventType = "BIRTHDAY" | "WEDDING" | "BABY" | "GENERAL";
+export type GiftEventType = "BIRTHDAY" | "ANNIVERSARY" | "WEDDING" | "BABY_SHOWER" | "HOLIDAY" | "CUSTOM";
 export type RecommendedAffiliateStatus = "none" | "matched" | "needs_review" | "manual";
 
 export type User = {
@@ -19,6 +20,7 @@ export type User = {
   email: string;
   name: string;
   isAdmin?: boolean;
+  onboardingCompleted?: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -112,6 +114,20 @@ export type Contribution = {
   amount: number;
   status: "placeholder";
   stripePaymentIntentId?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type GiftEvent = {
+  id: string;
+  ownerUserId: string;
+  profileId?: string;
+  title: string;
+  eventType: GiftEventType;
+  eventDate?: string;
+  groupLabel?: GroupLabel;
+  customGroupLabel?: string;
+  notes: string;
   createdAt: string;
   updatedAt: string;
 };

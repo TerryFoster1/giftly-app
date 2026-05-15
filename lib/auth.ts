@@ -212,6 +212,7 @@ export async function getCurrentUser(request?: Request) {
     email: session.user.email,
     name: session.user.name,
     isAdmin: session.user.isAdmin || isConfiguredAdminEmail(session.user.email),
+    onboardingCompleted: session.user.onboardingCompleted,
     createdAt: session.user.createdAt.toISOString(),
     updatedAt: session.user.updatedAt.toISOString()
   };
@@ -238,7 +239,8 @@ export async function signUpWithPassword(input: { name: string; email: string; p
         id: `user_${randomUUID()}`,
         email,
         name,
-        passwordHash: hashPassword(input.password)
+        passwordHash: hashPassword(input.password),
+        onboardingCompleted: false
       }
     });
 
@@ -288,6 +290,18 @@ export async function signUpWithPassword(input: { name: string; email: string; p
           isManagedProfile: true
         }
       ]
+    });
+
+    await tx.giftEvent.create({
+      data: {
+        id: `event_${randomUUID()}`,
+        ownerUserId: createdUser.id,
+        title: "Christmas gift planning",
+        eventType: "HOLIDAY",
+        eventDate: new Date(`${new Date().getFullYear()}-12-25T00:00:00.000Z`),
+        groupLabel: "FAMILY",
+        notes: "Reminder foundation for holiday gift planning."
+      }
     });
 
     return createdUser;

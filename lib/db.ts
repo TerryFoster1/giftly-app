@@ -1,15 +1,16 @@
-import { EventTag as DbEventTag, GroupLabel as DbGroupLabel, Prisma } from "@prisma/client";
+import { EventTag as DbEventTag, GiftEventType as DbGiftEventType, GroupLabel as DbGroupLabel, Prisma } from "@prisma/client";
 import { randomUUID } from "crypto";
 import { createAmazonAffiliateUrl, shouldPreserveManualAffiliateUrl } from "./affiliate";
 import { userHasAdminAccess } from "./auth";
 import { isAmazonUrl, normalizeAmazonProductUrl } from "./product-url";
 import { prisma } from "./prisma";
-import type { AdminOverview, AffiliateProgram, Connection, EventTag, GiftItem, GroupLabel, Profile, RecommendedProduct, Reservation, User } from "./types";
+import type { AdminOverview, AffiliateProgram, Connection, EventTag, GiftEvent, GiftEventType, GiftItem, GroupLabel, Profile, RecommendedProduct, Reservation, User } from "./types";
 
 type DbGift = Awaited<ReturnType<typeof prisma.giftItem.findFirst>>;
 type DbProfile = Awaited<ReturnType<typeof prisma.profile.findFirst>>;
 type DbReservation = Awaited<ReturnType<typeof prisma.reservation.findFirst>>;
 type DbConnection = Awaited<ReturnType<typeof prisma.connection.findFirst>>;
+type DbGiftEvent = Awaited<ReturnType<typeof prisma.giftEvent.findFirst>>;
 type DbRecommendedProduct = Awaited<ReturnType<typeof prisma.recommendedProduct.findFirst>>;
 type DbAffiliateProgram = Awaited<ReturnType<typeof prisma.affiliateProgram.findFirst>>;
 
@@ -102,6 +103,22 @@ export function toConnection(connection: NonNullable<DbConnection>): Connection 
     customGroupLabel: connection.customGroupLabel ?? undefined,
     createdAt: dateString(connection.createdAt),
     updatedAt: dateString(connection.updatedAt)
+  };
+}
+
+export function toGiftEvent(event: NonNullable<DbGiftEvent>): GiftEvent {
+  return {
+    id: event.id,
+    ownerUserId: event.ownerUserId,
+    profileId: event.profileId ?? undefined,
+    title: event.title,
+    eventType: event.eventType as GiftEventType,
+    eventDate: event.eventDate ? dateString(event.eventDate) : undefined,
+    groupLabel: event.groupLabel ? (event.groupLabel as GroupLabel) : undefined,
+    customGroupLabel: event.customGroupLabel ?? undefined,
+    notes: event.notes,
+    createdAt: dateString(event.createdAt),
+    updatedAt: dateString(event.updatedAt)
   };
 }
 
@@ -240,12 +257,13 @@ function giftToDb(gift: GiftItem, userId: string): Prisma.GiftItemUncheckedCreat
   };
 }
 
-export function toSafeUser(user: { id: string; email: string; name: string; isAdmin?: boolean; createdAt: Date | string; updatedAt: Date | string }): User {
+export function toSafeUser(user: { id: string; email: string; name: string; isAdmin?: boolean; onboardingCompleted?: boolean; createdAt: Date | string; updatedAt: Date | string }): User {
   return {
     id: user.id,
     email: user.email,
     name: user.name,
     isAdmin: user.isAdmin,
+    onboardingCompleted: user.onboardingCompleted,
     createdAt: dateString(user.createdAt),
     updatedAt: dateString(user.updatedAt)
   };
@@ -317,7 +335,7 @@ export async function ownsGift(userId: string, giftId: string) {
 }
 
 export async function getOwnerStore(user: User) {
-  const [profiles, gifts, reservations, connections] = await Promise.all([
+  const [profiles, gifts, reservations, connections, events] = await Promise.all([
     prisma.profile.findMany({ where: { ownerUserId: user.id }, orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }] }),
     prisma.giftItem.findMany({
       where: { profile: { ownerUserId: user.id } },
@@ -332,6 +350,10 @@ export async function getOwnerStore(user: User) {
         OR: [{ requesterUserId: user.id }, { targetUserId: user.id }]
       },
       orderBy: { createdAt: "desc" }
+    }),
+    prisma.giftEvent.findMany({
+      where: { ownerUserId: user.id },
+      orderBy: [{ eventDate: "asc" }, { createdAt: "desc" }]
     })
   ]);
 
@@ -340,8 +362,55 @@ export async function getOwnerStore(user: User) {
     profiles: profiles.map(toProfile),
     gifts: gifts.map(toGift),
     reservations: reservations.map(toReservation),
-    connections: connections.map(toConnection)
+    connections: connections.map(toConnection),
+    events: events.map(toGiftEvent)
   };
+}
+
+function normalizeGiftEventType(value?: GiftEventType | string): GiftEventType {
+  if (value === "ANNIVERSARY" || value === "WEDDING" || value === "BABY_SHOWER" || value === "HOLIDAY" || value === "CUSTOM") return value;
+  return "BIRTHDAY";
+}
+
+export async function createGiftEvent(
+  user: User,
+  input: {
+    title: string;
+    eventType?: GiftEventType;
+    eventDate?: string;
+    profileId?: string;
+    groupLabel?: GroupLabel;
+    customGroupLabel?: string;
+    notes?: string;
+  }
+) {
+  if (input.profileId && !(await ownsProfile(user.id, input.profileId))) throw new Error("FORBIDDEN");
+  const stamp = new Date();
+  const event = await prisma.giftEvent.create({
+    data: {
+      id: `event_${randomUUID()}`,
+      ownerUserId: user.id,
+      profileId: input.profileId || null,
+      title: input.title.trim() || "Gift planning event",
+      eventType: normalizeGiftEventType(input.eventType) as DbGiftEventType,
+      eventDate: input.eventDate ? new Date(input.eventDate) : null,
+      groupLabel: input.groupLabel ? (input.groupLabel as DbGroupLabel) : null,
+      customGroupLabel: input.customGroupLabel || null,
+      notes: input.notes?.trim() || "",
+      createdAt: stamp,
+      updatedAt: stamp
+    }
+  });
+
+  return toGiftEvent(event);
+}
+
+export async function completeOnboarding(user: User) {
+  const updated = await prisma.user.update({
+    where: { id: user.id },
+    data: { onboardingCompleted: true }
+  });
+  return toSafeUser(updated);
 }
 
 export async function createManagedProfile(
@@ -551,6 +620,9 @@ export async function resetUserGiftlyData(user: User) {
   const profileIds = ownedProfiles.map((profile) => profile.id);
 
   await prisma.$transaction([
+    prisma.giftEvent.deleteMany({
+      where: { ownerUserId: user.id }
+    }),
     prisma.contributionPlaceholder.deleteMany({
       where: { giftItem: { profileId: { in: profileIds } } }
     }),
