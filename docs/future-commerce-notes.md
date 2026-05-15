@@ -30,3 +30,12 @@ Phase 1 keeps Giftly as a gift notepad and shared wishlist planner. These notes 
 
 - Purchased/reserved status should be configurable so gift givers can avoid spoiling the surprise.
 - Future owner views may hide purchased details while still preventing duplicate buying for gift givers.
+
+## Discovery and Buying-for-Others Foundation
+
+- AI-assisted product recommendations should be an admin-reviewed discovery layer, not an automatic purchase flow.
+- Recommended products should support curated collections such as birthdays, weddings, new parents, housewarming, and popular saves.
+- Affiliate matching should happen after the product is saved or curated, with a clear fallback to the original merchant link.
+- Popular product analytics should favor aggregate trends and avoid revealing surprise-sensitive activity to wishlist owners.
+- Buy-for-others workflows should separate gift giver planning from recipient visibility, especially for reserved and purchased states.
+- Shared events and gift groups should later support group-specific recommendations, but payments, carts, co-pay, and held funds remain out of this phase.

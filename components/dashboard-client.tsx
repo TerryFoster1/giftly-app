@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Plus, Share2, Sparkles, X } from "lucide-react";
+import { CalendarDays, Plus, Share2, Sparkles, UsersRound, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useGiftlyStore } from "@/lib/store";
 import { getUpcomingProfileEvents } from "@/lib/events";
@@ -43,8 +43,16 @@ function wishlistVisibility(profile: Profile, gifts: GiftItem[]) {
   return profileGifts.some((gift) => gift.visibility !== "private") ? "shared" : "private";
 }
 
+function titleCaseGroup(value: string) {
+  return value
+    .toLowerCase()
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
 export function DashboardClient({ initialSlug }: { initialSlug?: string }) {
-  const { user, profiles, gifts, ready, actionError, actions } = useGiftlyStore();
+  const { user, profiles, gifts, connections = [], ready, actionError, actions } = useGiftlyStore();
   const [selectedProfileId, setSelectedProfileId] = useState("");
   const [eventFilter, setEventFilter] = useState("All");
   const [visibilityFilter, setVisibilityFilter] = useState<Visibility | "All">("All");
@@ -70,6 +78,24 @@ export function DashboardClient({ initialSlug }: { initialSlug?: string }) {
   const primaryProfile = profiles.find((profile) => profile.isPrimary) ?? profiles[0];
   const upcomingEvents = useMemo(() => getUpcomingProfileEvents(profiles).slice(0, 3), [profiles]);
   const isListDetail = Boolean(initialSlug);
+  const giftGroups = useMemo(() => {
+    const labels = Array.from(new Set(connections.map((connection) => connection.customGroupLabel || titleCaseGroup(connection.groupLabel))));
+    const baseGroups = labels.length ? labels : ["Family"];
+    return [
+      ...baseGroups.map((label) => ({
+        title: label,
+        description: "Plan gift ideas with the people closest to you.",
+        count: connections.filter((connection) => (connection.customGroupLabel || titleCaseGroup(connection.groupLabel)) === label).length || profiles.length,
+        tone: "bg-mint text-spruce"
+      })),
+      {
+        title: "Brian and Becky's Wedding",
+        description: "A shared-event space for registries, group notes, and gift coordination.",
+        count: 0,
+        tone: "bg-blush text-berry"
+      }
+    ];
+  }, [connections, profiles.length]);
 
   const visibleGifts = useMemo(() => {
     if (!selectedProfile) return [];
@@ -317,19 +343,12 @@ export function DashboardClient({ initialSlug }: { initialSlug?: string }) {
         </div>
       </section>
 
-      <section className="grid gap-3 rounded-[2rem] border border-dashed border-ink/15 bg-white p-4">
-        <div className="flex items-center gap-2">
-          <Sparkles size={18} className="text-berry" />
-          <h2 className="text-xl font-black">Recommended gifts</h2>
-        </div>
-        <p className="text-sm font-semibold leading-6 text-ink/60">
-          Future recommendations can help surface thoughtful gift ideas from saved inspiration, events, and shared wishlists.
-        </p>
-      </section>
-
       {upcomingEvents.length ? (
         <section className="rounded-[2rem] border border-ink/10 bg-white p-4 shadow-soft">
-          <p className="text-sm font-black uppercase text-berry">Upcoming Events</p>
+          <div className="flex items-center gap-2">
+            <CalendarDays size={18} className="text-berry" />
+            <p className="text-sm font-black uppercase text-berry">Upcoming Events</p>
+          </div>
           <div className="mt-3 grid gap-2">
             {upcomingEvents.map((event) => (
               <div className="flex items-center justify-between gap-3 rounded-2xl bg-cloud p-3" key={event.id}>
@@ -343,8 +362,51 @@ export function DashboardClient({ initialSlug }: { initialSlug?: string }) {
               </div>
             ))}
           </div>
+          <p className="mt-3 text-xs font-bold leading-5 text-ink/55">
+            Giftly will later include events from shared gift groups and connected people.
+          </p>
         </section>
       ) : null}
+
+      <section className="grid gap-3">
+        <div>
+          <p className="text-sm font-black uppercase text-berry">My Gift Groups</p>
+          <h2 className="text-2xl font-black">Plan gifts with your people</h2>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {giftGroups.map((group) => (
+            <article className="grid gap-3 rounded-[1.5rem] border border-ink/10 bg-white p-4 shadow-sm" key={group.title}>
+              <div className={`grid h-12 w-12 place-items-center rounded-2xl ${group.tone}`}>
+                <UsersRound size={22} />
+              </div>
+              <div>
+                <h3 className="text-lg font-black">{group.title}</h3>
+                <p className="mt-1 text-sm font-semibold leading-6 text-ink/60">{group.description}</p>
+              </div>
+              <p className="rounded-full bg-cloud px-3 py-1 text-xs font-black text-ink/60">
+                {group.count ? `${group.count} connected ${group.count === 1 ? "person" : "people"}` : "Shared event ready"}
+              </p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="grid gap-3 rounded-[2rem] border border-dashed border-ink/15 bg-white p-4">
+        <div className="flex items-center gap-2">
+          <Sparkles size={18} className="text-berry" />
+          <h2 className="text-xl font-black">Recommended gift ideas</h2>
+        </div>
+        <p className="text-sm font-semibold leading-6 text-ink/60">
+          Discover thoughtful gifts for upcoming events, shared wishlists, and the people you plan for most.
+        </p>
+        <div className="grid gap-2 sm:grid-cols-3">
+          {["For birthdays", "For weddings", "Popular saves"].map((label) => (
+            <div className="rounded-2xl bg-cloud p-3 text-sm font-black text-ink/65" key={label}>
+              {label}
+            </div>
+          ))}
+        </div>
+      </section>
 
       {isListDetail ? (
       <section className="grid gap-5">
