@@ -1,36 +1,37 @@
 import Link from "next/link";
-import { ExternalLink, Sparkles, Store } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
+import { GiftDetailActions } from "@/components/gift-detail-actions";
 import { AppShell } from "@/components/shell";
 import { Hearts } from "@/components/ui";
 import { getCurrentUser } from "@/lib/auth";
-import { getOwnedGiftDetail } from "@/lib/db";
+import { getGiftDetailForViewer } from "@/lib/db";
 
 export default async function GiftDetailPage({ params }: { params: { id: string } }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  const detail = await getOwnedGiftDetail(user, params.id);
+  const detail = await getGiftDetailForViewer(user, params.id);
   if (!detail) notFound();
 
-  const { gift, profile } = detail;
-  const priceLabel = gift.currency ? `${gift.currency} $${gift.price.toFixed(2)}` : gift.price ? gift.price.toFixed(2) : "Price not saved";
+  const { gift, profile, viewerRole } = detail;
   const buyUrl = gift.affiliateUrl || gift.monetizedUrl || gift.originalUrl || gift.productUrl;
   const description =
     gift.notes ||
-    "A saved gift idea for this wishlist. Add notes when you want to remember size, color, timing, or why this would be a thoughtful pick.";
+    "Saved gift idea. Add notes when you want to remember size, color, timing, or why this would be a thoughtful pick.";
+  const backHref = viewerRole === "owner" ? `/profiles/${profile.slug}` : `/shared/${profile.slug}`;
 
   return (
     <AppShell>
       <main className="mx-auto grid max-w-6xl gap-5 px-4 py-6">
-        <Link className="text-sm font-black text-spruce underline" href={`/profiles/${profile.slug}`}>
+        <Link className="text-sm font-black text-spruce underline" href={backHref}>
           Back to wishlist
         </Link>
 
         <section className="grid gap-5 lg:grid-cols-[minmax(0,1.08fr)_minmax(20rem,0.92fr)]">
           <div className="overflow-hidden rounded-[2rem] border border-ink/10 bg-white shadow-soft">
-            <div className="aspect-square bg-cloud sm:aspect-[4/3]">
-              <img src={gift.imageUrl} alt="" className="h-full w-full object-cover" />
+            <div className="aspect-square bg-cloud p-4 sm:aspect-[4/3]">
+              <img src={gift.imageUrl} alt="" className="h-full w-full object-contain" />
             </div>
           </div>
 
@@ -42,32 +43,16 @@ export default async function GiftDetailPage({ params }: { params: { id: string 
 
             <Hearts value={gift.wantRating} />
 
-            <div className="grid gap-3 rounded-3xl bg-cloud p-4">
-              <div className="flex items-center gap-2 text-sm font-black text-ink/60">
-                <Store size={16} className="text-berry" />
-                Store and price
-              </div>
-              <div className="flex flex-wrap items-end justify-between gap-3">
-                <p className="text-lg font-black">{gift.storeName || "Saved store"}</p>
-                <p className="rounded-full bg-white px-3 py-1 text-sm font-black text-spruce">{priceLabel}</p>
-              </div>
+            <div className="grid gap-2 rounded-3xl bg-cloud p-4">
+              <p className="text-sm font-black text-ink/70">Buy or reserve this gift</p>
+              <p className="text-xs font-bold leading-5 text-ink/55">
+                Reserve it so others know you're planning to buy it.
+              </p>
             </div>
 
             <p className="text-sm font-semibold leading-6 text-ink/65">{description}</p>
 
-            <a
-              className="focus-ring inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-coral px-4 py-2 text-sm font-extrabold text-white hover:bg-berry"
-              href={buyUrl}
-              rel="noreferrer"
-              target="_blank"
-            >
-              <ExternalLink size={16} />
-              Buy Now
-            </a>
-
-            <p className="text-xs font-bold leading-5 text-ink/50">
-              The original store link stays behind the Buy Now button. Future affiliate links can be swapped in without exposing raw source URLs.
-            </p>
+            <GiftDetailActions gift={gift} buyUrl={buyUrl} viewerRole={viewerRole} currentUserId={user.id} />
           </aside>
         </section>
 

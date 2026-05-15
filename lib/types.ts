@@ -128,9 +128,20 @@ export type GiftItem = {
   currentContributionAmount: number;
   reservedStatus: ReservationStatus;
   reservedBy?: string;
+  reservedByUserId?: string;
   purchasedStatus: boolean;
+  purchasedByUserId?: string;
   createdAt: string;
   updatedAt: string;
+};
+
+export type SharedWishlist = {
+  shareId: string;
+  ownerUserId: string;
+  ownerName: string;
+  profile: Profile;
+  gifts: GiftItem[];
+  eventDate?: string;
 };
 
 export type Reservation = {

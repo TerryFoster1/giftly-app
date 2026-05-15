@@ -92,6 +92,9 @@ export async function withUser<T>(
     if (error instanceof Error && error.message === "AFFILIATE_TAG_REQUIRED") {
       return json({ message: "Add an active Amazon tracking tag before scanning products." }, 400);
     }
+    if (error instanceof Error && error.message === "GIFT_UNAVAILABLE") {
+      return json({ message: "This gift is already reserved or purchased." }, 409);
+    }
     if (error instanceof Error && error.message === "AUTH_SECRET_REQUIRED") {
       return json({ message: "Server auth secret is not configured." }, 500);
     }

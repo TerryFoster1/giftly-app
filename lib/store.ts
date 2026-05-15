@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { Connection, ConnectionSource, GiftEvent, GiftEventType, GiftGroup, GiftGroupMember, GiftItem, GroupLabel, Profile, Reservation, User, WishlistShare } from "./types";
+import type { Connection, ConnectionSource, GiftEvent, GiftEventType, GiftGroup, GiftGroupMember, GiftItem, GroupLabel, Profile, Reservation, SharedWishlist, User, WishlistShare } from "./types";
 
 type GiftlyStore = {
   user?: User;
@@ -11,6 +11,7 @@ type GiftlyStore = {
   connections?: Connection[];
   groups?: GiftGroup[];
   wishlistShares?: WishlistShare[];
+  sharedWishlists?: SharedWishlist[];
   events?: GiftEvent[];
 };
 
@@ -211,6 +212,22 @@ export function useGiftlyStore() {
           });
           setStore((current) => ({ ...current, wishlistShares: [share, ...(current.wishlistShares ?? []).filter((item) => item.id !== share.id)] }));
           return share;
+        });
+      },
+      async updateSharedGift(giftId: string, action: "reserve" | "unreserve" | "purchase") {
+        return runAction(async () => {
+          const updated = await requestJson<GiftItem>(`/api/shared-gifts/${giftId}`, {
+            method: "PATCH",
+            body: JSON.stringify({ action })
+          });
+          setStore((current) => ({
+            ...current,
+            sharedWishlists: (current.sharedWishlists ?? []).map((wishlist) => ({
+              ...wishlist,
+              gifts: wishlist.gifts.map((gift) => (gift.id === updated.id ? updated : gift))
+            }))
+          }));
+          return updated;
         });
       },
       async updateVanityUrl(profileId: string, slug: string) {

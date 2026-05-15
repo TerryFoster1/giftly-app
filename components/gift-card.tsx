@@ -7,52 +7,62 @@ import { Hearts } from "./ui";
 
 type GiftCardProps = {
   gift: GiftItem;
+  currentUserId?: string;
   onEdit?: (gift: GiftItem) => void;
   onDelete?: (id: string) => void;
   onToggleReserved?: (gift: GiftItem) => void;
   onTogglePurchased?: (gift: GiftItem) => void;
   publicMode?: boolean;
   onReserve?: (gift: GiftItem) => void;
+  onUnreserve?: (gift: GiftItem) => void;
+  onMarkPurchased?: (gift: GiftItem) => void;
   onContribute?: (gift: GiftItem) => void;
 };
 
 export function GiftCard({
   gift,
+  currentUserId,
   onEdit,
   onDelete,
   onToggleReserved,
   onTogglePurchased,
   publicMode,
   onReserve,
+  onUnreserve,
+  onMarkPurchased,
   onContribute
 }: GiftCardProps) {
   const progress = gift.fundingGoalAmount ? Math.min(100, (gift.currentContributionAmount / gift.fundingGoalAmount) * 100) : 0;
   const priceLabel = gift.currency ? `${gift.currency} $${gift.price.toFixed(2)}` : gift.price ? gift.price.toFixed(2) : "Price not saved";
-  const metaLabel = [gift.storeName, priceLabel].filter(Boolean).join(" / ");
+  const metaLabel = publicMode ? "" : [gift.storeName, priceLabel].filter(Boolean).join(" / ");
   const detailPath = `/gifts/${gift.id}`;
   const buyUrl = gift.affiliateUrl || gift.monetizedUrl || gift.originalUrl || gift.productUrl;
-  const unavailableToViewer = publicMode && (gift.purchasedStatus || gift.reservedStatus === "reserved");
+  const reservedByCurrentViewer = Boolean(currentUserId && gift.reservedByUserId === currentUserId);
+  const reservedByOtherViewer = gift.reservedStatus === "reserved" && !reservedByCurrentViewer;
+  const unavailableToViewer = publicMode && (gift.purchasedStatus || reservedByOtherViewer);
   const image = (
-    <div className="aspect-[6/4] bg-cloud">
-      <img src={gift.imageUrl} alt="" className="h-full w-full object-cover" />
+    <div className="aspect-[6/4] bg-cloud p-2">
+      <img src={gift.imageUrl} alt="" className="h-full w-full object-contain" />
     </div>
   );
 
   return (
     <article className="group overflow-hidden rounded-[1.15rem] border border-ink/10 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft">
-      {publicMode ? image : <Link className="block" href={detailPath}>{image}</Link>}
+      <Link className="block" href={detailPath}>{image}</Link>
       <div className="grid gap-2 p-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="text-[0.68rem] font-black uppercase tracking-[0.08em] text-berry">{gift.eventTag}</p>
             {publicMode ? (
-              <h3 className="mt-0.5 text-base font-black leading-tight">{gift.title}</h3>
+              <Link className="mt-0.5 block text-base font-black leading-tight hover:text-berry" href={detailPath}>
+                {gift.title}
+              </Link>
             ) : (
               <Link className="mt-0.5 block text-base font-black leading-tight hover:text-berry" href={detailPath}>
                 {gift.title}
               </Link>
             )}
-            <p className="mt-1 text-xs font-bold text-ink/55">{metaLabel}</p>
+            {metaLabel ? <p className="mt-1 text-xs font-bold text-ink/55">{metaLabel}</p> : null}
           </div>
           <Hearts value={gift.wantRating} />
         </div>
@@ -69,7 +79,7 @@ export function GiftCard({
           </div>
         ) : (
           <p className="rounded-2xl bg-cloud p-2 text-xs font-bold text-ink/65">
-            {gift.purchasedStatus ? "This gift has already been purchased." : gift.reservedStatus === "reserved" ? "This gift is already reserved." : "Available to reserve."}
+            {gift.purchasedStatus ? "Purchased by someone." : reservedByCurrentViewer ? "Reserved by you." : gift.reservedStatus === "reserved" ? "Reserved by someone." : "Available to reserve."}
           </p>
         )}
 
@@ -103,10 +113,18 @@ export function GiftCard({
                   target="_blank"
                 >
                   <ExternalLink size={16} />
-                  Buy from Store
+                  Buy Now
                 </a>
               )}
-              {unavailableToViewer ? (
+              {reservedByCurrentViewer ? (
+                <button
+                  type="button"
+                  className="focus-ring min-h-9 rounded-2xl border border-ink/10 bg-white px-3 text-xs font-black text-ink hover:bg-blush"
+                  onClick={() => onUnreserve?.(gift)}
+                >
+                  Reserved by you - unreserve
+                </button>
+              ) : unavailableToViewer ? (
                 <button type="button" className="min-h-9 rounded-2xl border border-ink/10 bg-white px-3 text-xs font-black text-ink/45" disabled>
                   Already planned
                 </button>
@@ -119,6 +137,16 @@ export function GiftCard({
                   Reserve Gift
                 </button>
               )}
+              {onMarkPurchased ? (
+                <button
+                  type="button"
+                  className="focus-ring min-h-9 rounded-2xl border border-ink/10 bg-white px-3 text-xs font-black text-ink hover:bg-blush disabled:text-ink/35"
+                  disabled={unavailableToViewer}
+                  onClick={() => onMarkPurchased(gift)}
+                >
+                  Mark purchased
+                </button>
+              ) : null}
               {gift.allowContributions ? (
                 <button
                   type="button"

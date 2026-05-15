@@ -4,7 +4,7 @@ import { createAmazonAffiliateUrl, shouldPreserveManualAffiliateUrl } from "./af
 import { userHasAdminAccess } from "./auth";
 import { isAmazonUrl, normalizeAmazonProductUrl } from "./product-url";
 import { prisma } from "./prisma";
-import type { AdminOverview, AffiliateProgram, Connection, ConnectionSource, ConnectionStatus, EventTag, GiftEvent, GiftEventType, GiftGroup, GiftGroupMember, GiftItem, GroupLabel, Profile, RecommendedProduct, Reservation, User, WishlistShare } from "./types";
+import type { AdminOverview, AffiliateProgram, Connection, ConnectionSource, ConnectionStatus, EventTag, GiftEvent, GiftEventType, GiftGroup, GiftGroupMember, GiftItem, GroupLabel, Profile, RecommendedProduct, Reservation, SharedWishlist, User, WishlistShare } from "./types";
 
 type DbGift = Awaited<ReturnType<typeof prisma.giftItem.findFirst>>;
 type DbProfile = Awaited<ReturnType<typeof prisma.profile.findFirst>>;
@@ -204,7 +204,9 @@ export function toGift(gift: NonNullable<DbGift>): GiftItem {
     currentContributionAmount: gift.currentContributionAmount,
     reservedStatus: gift.reservedStatus as GiftItem["reservedStatus"],
     reservedBy: gift.reservedBy ?? undefined,
+    reservedByUserId: gift.reservedByUserId ?? undefined,
     purchasedStatus: gift.purchasedStatus,
+    purchasedByUserId: gift.purchasedByUserId ?? undefined,
     createdAt: dateString(gift.createdAt),
     updatedAt: dateString(gift.updatedAt)
   };
@@ -298,9 +300,33 @@ function giftToDb(gift: GiftItem, userId: string): Prisma.GiftItemUncheckedCreat
     currentContributionAmount: gift.currentContributionAmount,
     reservedStatus: gift.reservedStatus,
     reservedBy: gift.reservedBy ?? null,
+    reservedByUserId: gift.reservedByUserId ?? null,
     purchasedStatus: gift.purchasedStatus,
+    purchasedByUserId: gift.purchasedByUserId ?? null,
     createdAt: new Date(gift.createdAt),
     updatedAt: new Date(gift.updatedAt)
+  };
+}
+
+function spoilerSafeOwnerGift(gift: GiftItem, ownerUserId: string): GiftItem {
+  const reservedByOtherUser = Boolean(gift.reservedByUserId && gift.reservedByUserId !== ownerUserId);
+  const purchasedByOtherUser = Boolean(gift.purchasedByUserId && gift.purchasedByUserId !== ownerUserId);
+  if (!reservedByOtherUser && !purchasedByOtherUser) return gift;
+  return {
+    ...gift,
+    reservedStatus: reservedByOtherUser ? "available" : gift.reservedStatus,
+    reservedBy: reservedByOtherUser ? undefined : gift.reservedBy,
+    reservedByUserId: reservedByOtherUser ? undefined : gift.reservedByUserId,
+    purchasedStatus: purchasedByOtherUser ? false : gift.purchasedStatus,
+    purchasedByUserId: purchasedByOtherUser ? undefined : gift.purchasedByUserId
+  };
+}
+
+function publicFacingGift(gift: GiftItem): GiftItem {
+  return {
+    ...gift,
+    storeName: "",
+    priceSourceUrl: undefined
   };
 }
 
@@ -403,7 +429,7 @@ async function ensureDefaultGiftGroups(userId: string) {
 export async function getOwnerStore(user: User) {
   await ensureDefaultGiftGroups(user.id);
 
-  const [profiles, gifts, reservations, connections, events, groups, wishlistShares] = await Promise.all([
+  const [profiles, gifts, reservations, connections, events, groups, wishlistShares, sharedWishlists] = await Promise.all([
     prisma.profile.findMany({ where: { ownerUserId: user.id }, orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }] }),
     prisma.giftItem.findMany({
       where: { profile: { ownerUserId: user.id } },
@@ -432,19 +458,88 @@ export async function getOwnerStore(user: User) {
       where: { ownerUserId: user.id },
       include: { exclusions: true },
       orderBy: { createdAt: "desc" }
-    })
+    }),
+    getSharedWishlistsForUser(user)
   ]);
 
   return {
     user,
     profiles: profiles.map(toProfile),
-    gifts: gifts.map(toGift),
+    gifts: gifts.map(toGift).map((gift) => spoilerSafeOwnerGift(gift, user.id)),
     reservations: reservations.map(toReservation),
     connections: connections.map(toConnection),
     events: events.map(toGiftEvent),
     groups: groups.map(toGiftGroup),
-    wishlistShares: wishlistShares.map(toWishlistShare)
+    wishlistShares: wishlistShares.map(toWishlistShare),
+    sharedWishlists
   };
+}
+
+export async function getSharedWishlistsForUser(user: User): Promise<SharedWishlist[]> {
+  const inboundConnections = await prisma.connection.findMany({
+    where: {
+      targetUserId: user.id,
+      status: "ACCEPTED"
+    },
+    select: { id: true }
+  });
+  const connectionIds = inboundConnections.map((connection) => connection.id);
+
+  const groupMembers = await prisma.giftGroupMember.findMany({
+    where: {
+      connectedUserId: user.id,
+      status: "ACCEPTED"
+    },
+    select: { groupId: true, connectionId: true }
+  });
+  const groupIds = Array.from(new Set(groupMembers.map((member) => member.groupId)));
+  const viewerConnectionIds = Array.from(new Set([...connectionIds, ...groupMembers.map((member) => member.connectionId).filter((id): id is string => Boolean(id))]));
+
+  if (!viewerConnectionIds.length && !groupIds.length) return [];
+
+  const shares = await prisma.wishlistShare.findMany({
+    where: {
+      OR: [
+        viewerConnectionIds.length ? { connectionId: { in: viewerConnectionIds } } : undefined,
+        groupIds.length ? { groupId: { in: groupIds } } : undefined
+      ].filter(Boolean) as Prisma.WishlistShareWhereInput[],
+      exclusions: viewerConnectionIds.length
+        ? {
+            none: {
+              connectionId: { in: viewerConnectionIds }
+            }
+          }
+        : undefined
+    },
+    include: {
+      profile: {
+        include: {
+          owner: true,
+          gifts: {
+            where: { hiddenFromRecipient: false },
+            orderBy: [{ wantRating: "desc" }, { createdAt: "desc" }]
+          }
+        }
+      },
+      exclusions: true
+    },
+    orderBy: { createdAt: "desc" }
+  });
+
+  const byProfile = new Map<string, SharedWishlist>();
+  for (const share of shares) {
+    if (share.profile.ownerUserId === user.id) continue;
+    if (byProfile.has(share.profileId)) continue;
+    byProfile.set(share.profileId, {
+      shareId: share.id,
+      ownerUserId: share.ownerUserId,
+      ownerName: share.profile.owner.name,
+      profile: toProfile(share.profile),
+      gifts: share.profile.gifts.map(toGift).map(publicFacingGift)
+    });
+  }
+
+  return Array.from(byProfile.values());
 }
 
 function normalizeGiftEventType(value?: GiftEventType | string): GiftEventType {
@@ -1021,9 +1116,119 @@ export async function getOwnedGiftDetail(user: User, id: string) {
   if (!gift) return null;
 
   return {
-    gift: toGift(gift),
+    gift: spoilerSafeOwnerGift(toGift(gift), user.id),
     profile: toProfile(gift.profile)
   };
+}
+
+async function userCanAccessSharedProfile(user: User, profileId: string) {
+  const inboundConnections = await prisma.connection.findMany({
+    where: { targetUserId: user.id, status: "ACCEPTED" },
+    select: { id: true }
+  });
+  const directConnectionIds = inboundConnections.map((connection) => connection.id);
+  const groupMembers = await prisma.giftGroupMember.findMany({
+    where: { connectedUserId: user.id, status: "ACCEPTED" },
+    select: { groupId: true, connectionId: true }
+  });
+  const viewerConnectionIds = Array.from(new Set([...directConnectionIds, ...groupMembers.map((member) => member.connectionId).filter((id): id is string => Boolean(id))]));
+  const groupIds = Array.from(new Set(groupMembers.map((member) => member.groupId)));
+
+  if (!viewerConnectionIds.length && !groupIds.length) return false;
+
+  const share = await prisma.wishlistShare.findFirst({
+    where: {
+      profileId,
+      OR: [
+        viewerConnectionIds.length ? { connectionId: { in: viewerConnectionIds } } : undefined,
+        groupIds.length ? { groupId: { in: groupIds } } : undefined
+      ].filter(Boolean) as Prisma.WishlistShareWhereInput[],
+      exclusions: viewerConnectionIds.length
+        ? {
+            none: {
+              connectionId: { in: viewerConnectionIds }
+            }
+          }
+        : undefined
+    }
+  });
+
+  return Boolean(share);
+}
+
+export async function getGiftDetailForViewer(user: User, id: string) {
+  const gift = await prisma.giftItem.findFirst({
+    where: { id },
+    include: { profile: true }
+  });
+  if (!gift) return null;
+
+  if (gift.profile.ownerUserId === user.id) {
+    return {
+      gift: spoilerSafeOwnerGift(toGift(gift), user.id),
+      profile: toProfile(gift.profile),
+      viewerRole: "owner" as const
+    };
+  }
+
+  if (gift.hiddenFromRecipient || !(await userCanAccessSharedProfile(user, gift.profileId))) return null;
+
+  return {
+    gift: publicFacingGift(toGift(gift)),
+    profile: toProfile(gift.profile),
+    viewerRole: "shared" as const
+  };
+}
+
+export async function updateSharedGiftPlan(user: User, giftId: string, action: "reserve" | "unreserve" | "purchase") {
+  const gift = await prisma.giftItem.findFirst({
+    where: { id: giftId },
+    include: { profile: true }
+  });
+  if (!gift || gift.profile.ownerUserId === user.id || gift.hiddenFromRecipient) throw new Error("FORBIDDEN");
+  if (!(await userCanAccessSharedProfile(user, gift.profileId))) throw new Error("FORBIDDEN");
+
+  if (action === "reserve") {
+    if (gift.purchasedStatus || (gift.reservedByUserId && gift.reservedByUserId !== user.id)) throw new Error("GIFT_UNAVAILABLE");
+    const updated = await prisma.giftItem.update({
+      where: { id: gift.id },
+      data: {
+        reservedStatus: "reserved",
+        reservedBy: "Reserved",
+        reservedByUserId: user.id,
+        updatedAt: new Date()
+      }
+    });
+    return publicFacingGift(toGift(updated));
+  }
+
+  if (action === "unreserve") {
+    if (gift.reservedByUserId !== user.id) throw new Error("FORBIDDEN");
+    const updated = await prisma.giftItem.update({
+      where: { id: gift.id },
+      data: {
+        reservedStatus: "available",
+        reservedBy: null,
+        reservedByUserId: null,
+        updatedAt: new Date()
+      }
+    });
+    return publicFacingGift(toGift(updated));
+  }
+
+  if (gift.purchasedStatus || (gift.reservedByUserId && gift.reservedByUserId !== user.id)) throw new Error("GIFT_UNAVAILABLE");
+  const updated = await prisma.giftItem.update({
+    where: { id: gift.id },
+    data: {
+      reservedStatus: "reserved",
+      reservedBy: "Reserved",
+      reservedByUserId: user.id,
+      purchasedStatus: true,
+      purchasedByUserId: user.id,
+      updatedAt: new Date()
+    }
+  });
+  return publicFacingGift(toGift(updated));
 }
 
 export async function deleteProfile(user: User, profileId: string) {
@@ -1116,7 +1321,7 @@ export async function getPublicProfile(slug: string) {
 
   return {
     profile: toProfile(profile),
-    gifts: gifts.map(toGift)
+    gifts: gifts.map(toGift).map(publicFacingGift)
   };
 }
 

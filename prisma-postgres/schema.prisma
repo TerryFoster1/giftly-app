@@ -218,7 +218,9 @@ model GiftItem {
   currentContributionAmount  Float                       @default(0)
   reservedStatus             ReservationStatus           @default(available)
   reservedBy                 String?
+  reservedByUserId           String?
   purchasedStatus            Boolean                     @default(false)
+  purchasedByUserId          String?
   reservations               Reservation[]
   contributionPlaceholders   ContributionPlaceholder[]
   createdAt                  DateTime                    @default(now())
