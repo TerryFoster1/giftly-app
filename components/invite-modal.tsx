@@ -1,6 +1,6 @@
 "use client";
 
-import { Copy, Mail, QrCode, UsersRound, X } from "lucide-react";
+import { Copy, Mail, QrCode, Share2, UsersRound, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { GroupLabel } from "@/lib/types";
 import { Button, Field, Input, Select } from "./ui";
@@ -46,6 +46,18 @@ export function InviteModal({ open, title = "Invite Friends & Family", profileUr
   async function copyLink() {
     await navigator.clipboard?.writeText(profileUrl);
     setMessage("Invite link copied.");
+  }
+
+  async function shareLink() {
+    if (navigator.share) {
+      await navigator.share({
+        title: "Join me on Giftly",
+        text: "I am using Giftly to make wishlists and gift planning easier.",
+        url: profileUrl
+      });
+      return;
+    }
+    await copyLink();
   }
 
   async function saveInvite() {
@@ -99,10 +111,16 @@ export function InviteModal({ open, title = "Invite Friends & Family", profileUr
             <Field label="Invite link">
               <Input readOnly value={profileUrl} />
             </Field>
-            <Button type="button" variant="secondary" onClick={copyLink}>
-              <Copy size={16} />
-              Copy invite link
-            </Button>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Button type="button" variant="secondary" onClick={copyLink}>
+                <Copy size={16} />
+                Copy invite link
+              </Button>
+              <Button type="button" onClick={shareLink}>
+                <Share2 size={16} />
+                Share
+              </Button>
+            </div>
           </div>
 
           <div className="grid gap-3 rounded-3xl border border-ink/10 p-3">

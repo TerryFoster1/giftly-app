@@ -61,7 +61,7 @@ export async function POST(request: Request) {
     const cookie = serializeSessionCookie(session);
     const response = wantsJson(request)
       ? NextResponse.json({ ok: true }, { status: 201, headers: { "Cache-Control": "no-store", "Set-Cookie": cookie } })
-      : redirectWithSessionCookie(new URL("/profiles", request.url), cookie);
+      : redirectWithSessionCookie(new URL("/onboarding", request.url), cookie);
     console.info("[auth-debug] Setting session cookie", {
       route: "signup",
       runtime: process.env.NEXT_RUNTIME ?? "nodejs",

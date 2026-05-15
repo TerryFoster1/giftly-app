@@ -42,3 +42,8 @@ These are intentionally future-facing notes. They are not part of the current MV
 - Current MVP stores Amazon Associates tracking tags only and appends the `tag` query parameter for Amazon product URLs.
 - Future support may include Amazon PA API, affiliate APIs, automated enrichment, AI affiliate matching, pricing sync, and multi-network support.
 - Do not store affiliate account passwords or dashboard login credentials.
+
+## Vendor QR and Save-Later
+
+- See `docs/vendor-save-later-foundation.md` for the future vendor product source, QR save-later, and vendor ownership concepts.
+- The current phase does not include vendor marketplace pages, vendor payouts, payment processing, or marketplace checkout.

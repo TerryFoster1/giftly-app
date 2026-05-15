@@ -66,6 +66,9 @@ export function OnboardingCard({ userName, wishlistCount, onCreateWishlist, onIn
         <Link className="focus-ring inline-flex min-h-11 items-center justify-center rounded-2xl bg-mint px-4 py-2 text-sm font-extrabold text-spruce hover:bg-spruce hover:text-white" href="/profiles">
           Add birthdays
         </Link>
+        <Link className="focus-ring inline-flex min-h-11 items-center justify-center rounded-2xl border border-ink/10 bg-white px-4 py-2 text-sm font-extrabold text-ink hover:bg-blush" href="/onboarding">
+          Guided setup
+        </Link>
         <Button type="button" variant="ghost" onClick={onInvite}>
           <UsersRound size={16} />
           Invite people
