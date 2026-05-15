@@ -5,15 +5,47 @@ import { CalendarDays, Plus, Share2, Sparkles, UsersRound, X } from "lucide-reac
 import { useMemo, useState } from "react";
 import { useGiftlyStore } from "@/lib/store";
 import { getUpcomingProfileEvents } from "@/lib/events";
-import { eventTags, type GiftItem, type Profile, type Visibility } from "@/lib/types";
+import { eventTags, type GiftItem, type GroupLabel, type Profile, type Visibility } from "@/lib/types";
 import { normalizeProductUrl } from "@/lib/product-url";
 import { publicProfilePath, publicProfileUrl } from "@/lib/url";
 import { GiftCard } from "./gift-card";
 import { GiftForm } from "./gift-form";
-import { QrCard } from "./qr-card";
+import { InviteModal } from "./invite-modal";
 import { Button, Field, Input, Select } from "./ui";
 
 const fallbackImage = "https://images.unsplash.com/photo-1513201099705-a9746e1e201f?q=80&w=600&auto=format&fit=crop";
+const foundationGiftGroups = [
+  {
+    title: "Family",
+    description: "Share wishlists and birthdays with the people who buy for each other most often.",
+    tone: "bg-mint text-spruce"
+  },
+  {
+    title: "Wedding",
+    description: "Coordinate registry ideas, shared events, and thoughtful gifts around a couple.",
+    tone: "bg-blush text-berry"
+  },
+  {
+    title: "Household",
+    description: "Keep practical shared gift ideas for the people under one roof.",
+    tone: "bg-honey/50 text-ink"
+  },
+  {
+    title: "Friends",
+    description: "Save birthday ideas, group plans, and gift inspiration for close friends.",
+    tone: "bg-cloud text-ink"
+  },
+  {
+    title: "Kids",
+    description: "Manage wishlists now, then invite or transfer ownership when they are ready.",
+    tone: "bg-blush text-berry"
+  },
+  {
+    title: "Couples",
+    description: "Plan partner-specific gift ideas with room for surprise-safe buying later.",
+    tone: "bg-mint text-spruce"
+  }
+];
 
 type MetadataResult = {
   title?: string;
@@ -78,24 +110,26 @@ export function DashboardClient({ initialSlug }: { initialSlug?: string }) {
   const primaryProfile = profiles.find((profile) => profile.isPrimary) ?? profiles[0];
   const upcomingEvents = useMemo(() => getUpcomingProfileEvents(profiles).slice(0, 3), [profiles]);
   const isListDetail = Boolean(initialSlug);
+  const existingGroupNames = useMemo(
+    () => Array.from(new Set(connections.map((connection) => connection.customGroupLabel || titleCaseGroup(connection.groupLabel)).filter(Boolean))),
+    [connections]
+  );
   const giftGroups = useMemo(() => {
-    const labels = Array.from(new Set(connections.map((connection) => connection.customGroupLabel || titleCaseGroup(connection.groupLabel))));
-    const baseGroups = labels.length ? labels : ["Family"];
-    return [
-      ...baseGroups.map((label) => ({
+    const customGroups = existingGroupNames
+      .filter((label) => !foundationGiftGroups.some((group) => group.title === label))
+      .map((label) => ({
         title: label,
-        description: "Plan gift ideas with the people closest to you.",
-        count: connections.filter((connection) => (connection.customGroupLabel || titleCaseGroup(connection.groupLabel)) === label).length || profiles.length,
-        tone: "bg-mint text-spruce"
-      })),
-      {
-        title: "Brian and Becky's Wedding",
-        description: "A shared-event space for registries, group notes, and gift coordination.",
-        count: 0,
-        tone: "bg-blush text-berry"
-      }
-    ];
-  }, [connections, profiles.length]);
+        description: "A shared space for wishlists, events, and gift planning.",
+        tone: "bg-cloud text-ink"
+      }));
+
+    return [...foundationGiftGroups, ...customGroups].map((group) => ({
+      ...group,
+      count:
+        connections.filter((connection) => (connection.customGroupLabel || titleCaseGroup(connection.groupLabel)) === group.title).length ||
+        (group.title === "Family" ? profiles.length : 0)
+    }));
+  }, [connections, existingGroupNames, profiles.length]);
 
   const visibleGifts = useMemo(() => {
     if (!selectedProfile) return [];
@@ -248,6 +282,11 @@ export function DashboardClient({ initialSlug }: { initialSlug?: string }) {
     } catch {
       // The shared store surfaces the friendly error message.
     }
+  }
+
+  async function saveInvite(input: { emailOrPhone?: string; groupLabel: GroupLabel; customGroupLabel?: string }) {
+    await actions.createConnection(input);
+    await actions.refresh();
   }
 
   if (!ready) {
@@ -437,6 +476,10 @@ export function DashboardClient({ initialSlug }: { initialSlug?: string }) {
             <Share2 size={16} />
             Share your Giftly profile
           </Button>
+          <Button type="button" variant="ghost" onClick={() => setShareOpen(true)}>
+            <UsersRound size={16} />
+            Invite family members
+          </Button>
         </div>
       </section>
 
@@ -530,6 +573,10 @@ export function DashboardClient({ initialSlug }: { initialSlug?: string }) {
               <p className="rounded-full bg-cloud px-3 py-1 text-xs font-black text-ink/60">
                 {group.count ? `${group.count} connected ${group.count === 1 ? "person" : "people"}` : "Shared event ready"}
               </p>
+              <Button type="button" variant="ghost" onClick={() => setShareOpen(true)}>
+                <Share2 size={16} />
+                Invite
+              </Button>
             </article>
           ))}
         </div>
@@ -600,25 +647,14 @@ export function DashboardClient({ initialSlug }: { initialSlug?: string }) {
         </div>
       ) : null}
 
-      {shareOpen && primaryProfile ? (
-        <div className="fixed inset-0 z-40 grid place-items-end bg-ink/40 p-0 sm:place-items-center sm:p-4">
-          <div className="max-h-[92vh] w-full max-w-md overflow-auto rounded-t-[2rem] bg-white p-4 shadow-soft sm:rounded-[2rem]">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-xl font-black">Share your Giftly profile</h2>
-              <Button type="button" variant="ghost" onClick={() => setShareOpen(false)} aria-label="Close">
-                <X size={16} />
-              </Button>
-            </div>
-            <div className="mt-4 grid gap-3">
-              <Input readOnly value={publicProfileUrl(primaryProfile.slug)} />
-              <Button type="button" onClick={() => navigator.clipboard?.writeText(publicProfileUrl(primaryProfile.slug))}>
-                Copy link
-              </Button>
-              <QrCard url={publicProfileUrl(primaryProfile.slug)} />
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <InviteModal
+        open={shareOpen && Boolean(primaryProfile)}
+        title="Share your Giftly profile"
+        profileUrl={primaryProfile ? publicProfileUrl(primaryProfile.slug) : ""}
+        existingGroups={existingGroupNames}
+        onClose={() => setShareOpen(false)}
+        onInvite={saveInvite}
+      />
     </main>
   );
 }

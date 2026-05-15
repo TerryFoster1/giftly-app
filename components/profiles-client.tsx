@@ -9,6 +9,7 @@ import type { GroupLabel } from "@/lib/types";
 import { publicProfilePath, publicProfileUrl } from "@/lib/url";
 import { Button, Field, Input, Select, Textarea } from "./ui";
 import { QrCard } from "./qr-card";
+import { InviteModal } from "./invite-modal";
 
 export function ProfilesClient() {
   const { user, profiles, connections = [], actionError, actions, ready } = useGiftlyStore();
@@ -107,7 +108,26 @@ export function ProfilesClient() {
     }
   }
 
+  async function saveInvite(input: { emailOrPhone?: string; groupLabel: GroupLabel; customGroupLabel?: string }) {
+    await actions.createConnection(input);
+    await actions.refresh();
+  }
+
   const groupOptions: GroupLabel[] = ["FAMILY", "FRIENDS", "PARTNER", "GUESTS", "CUSTOM"];
+  const existingGroupNames = Array.from(
+    new Set(
+      connections
+        .map((connection) =>
+          connection.customGroupLabel ||
+          connection.groupLabel
+            .toLowerCase()
+            .split("_")
+            .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+            .join(" ")
+        )
+        .filter(Boolean)
+    )
+  );
 
   return (
     <main className="mx-auto grid max-w-6xl gap-6 px-4 py-6 lg:grid-cols-[1fr_22rem]">
@@ -173,7 +193,9 @@ export function ProfilesClient() {
                     Scan QR
                   </Button>
                 </div>
-                <p className="text-xs font-bold text-ink/55">For MVP, saving this creates a pending connection request. Live sending and QR scanning come later.</p>
+                <p className="text-xs font-bold leading-5 text-ink/55">
+                  For MVP, saving this creates a pending connection request. Live sending, connection codes, and QR scanning come later.
+                </p>
               </div>
             ) : (
               <div className="grid gap-3 sm:grid-cols-2">
@@ -226,7 +248,9 @@ export function ProfilesClient() {
                 <Field label="Bio / notes">
                   <Textarea value={form.bio} onChange={(event) => setForm({ ...form, bio: event.target.value })} />
                 </Field>
-                <p className="rounded-2xl bg-cloud p-3 text-xs font-bold text-ink/55">Giftly will generate the public link automatically.</p>
+                <p className="rounded-2xl bg-cloud p-3 text-xs font-bold leading-5 text-ink/55">
+                  Giftly will generate the public link automatically. This can start as a managed wishlist, then later be invited, claimed, or transferred when the person joins.
+                </p>
               </>
             ) : null}
             <Button type="submit">{form.hasAccount === "yes" ? "Create Pending Connection" : "Save Profile"}</Button>
@@ -313,7 +337,7 @@ export function ProfilesClient() {
                 </div>
               ) : profile.isManagedProfile ? (
                 <p className="mt-4 rounded-2xl bg-cloud p-3 text-xs font-bold text-ink/55">
-                  This is a managed wishlist. If this person joins Giftly later, they can connect to this profile.
+                  This is a managed wishlist. If this person joins Giftly later, they can connect to this profile and ownership can be transferred after a safe claim flow.
                 </p>
               ) : null}
               <div className="mt-4 grid gap-2 sm:grid-cols-4">
@@ -348,6 +372,14 @@ export function ProfilesClient() {
           </div>
         )}
       </aside>
+      <InviteModal
+        open={Boolean(shareSlug)}
+        title="Share this wishlist"
+        profileUrl={shareSlug ? publicProfileUrl(shareSlug) : ""}
+        existingGroups={existingGroupNames}
+        onClose={() => setShareSlug("")}
+        onInvite={saveInvite}
+      />
     </main>
   );
 }

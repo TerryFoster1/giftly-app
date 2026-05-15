@@ -39,3 +39,12 @@ Phase 1 keeps Giftly as a gift notepad and shared wishlist planner. These notes 
 - Popular product analytics should favor aggregate trends and avoid revealing surprise-sensitive activity to wishlist owners.
 - Buy-for-others workflows should separate gift giver planning from recipient visibility, especially for reserved and purchased states.
 - Shared events and gift groups should later support group-specific recommendations, but payments, carts, co-pay, and held funds remain out of this phase.
+
+## Sharing and Growth Foundation
+
+- Invites create pending connection records first; live email, SMS, and QR scanning can be added as delivery layers later.
+- Group labels such as Wedding, Household, Kids, and Couples can use `customGroupLabel` until advanced group permissions need a richer model.
+- Groups should eventually control wishlist visibility, event visibility, collaborative planning, and surprise-safe buying rules.
+- Managed profiles should remain owned by the creator until a future claim/transfer flow verifies the joining person.
+- Ownership transfer should be explicit, auditable, and reversible only through support/admin tools if a claim is disputed.
+- Growth prompts should be placed where they help the user finish a gifting task, not as repeated referral banners.
