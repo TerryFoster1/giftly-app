@@ -2,13 +2,14 @@ import { EventTag as DbEventTag, GroupLabel as DbGroupLabel, Prisma } from "@pri
 import { randomUUID } from "crypto";
 import { userHasAdminAccess } from "./auth";
 import { prisma } from "./prisma";
-import type { AdminOverview, Connection, EventTag, GiftItem, GroupLabel, Profile, RecommendedProduct, Reservation, User } from "./types";
+import type { AdminOverview, AffiliateProgram, Connection, EventTag, GiftItem, GroupLabel, Profile, RecommendedProduct, Reservation, User } from "./types";
 
 type DbGift = Awaited<ReturnType<typeof prisma.giftItem.findFirst>>;
 type DbProfile = Awaited<ReturnType<typeof prisma.profile.findFirst>>;
 type DbReservation = Awaited<ReturnType<typeof prisma.reservation.findFirst>>;
 type DbConnection = Awaited<ReturnType<typeof prisma.connection.findFirst>>;
 type DbRecommendedProduct = Awaited<ReturnType<typeof prisma.recommendedProduct.findFirst>>;
+type DbAffiliateProgram = Awaited<ReturnType<typeof prisma.affiliateProgram.findFirst>>;
 
 const eventToDb: Record<EventTag, string> = {
   Birthday: "Birthday",
@@ -182,6 +183,20 @@ export function toRecommendedProduct(product: NonNullable<DbRecommendedProduct>)
   };
 }
 
+export function toAffiliateProgram(program: NonNullable<DbAffiliateProgram>): AffiliateProgram {
+  return {
+    id: program.id,
+    name: program.name,
+    trackingId: program.trackingId,
+    defaultDomain: program.defaultDomain,
+    notes: program.notes,
+    active: program.active,
+    createdByUserId: program.createdByUserId ?? undefined,
+    createdAt: dateString(program.createdAt),
+    updatedAt: dateString(program.updatedAt)
+  };
+}
+
 function giftToDb(gift: GiftItem, userId: string): Prisma.GiftItemUncheckedCreateInput {
   return {
     id: gift.id,
@@ -257,6 +272,55 @@ function normalizeRecommendedProductInput(input: Partial<RecommendedProduct>, us
     featured: input.featured ?? false,
     hot: input.hot ?? false,
     seasonal: input.seasonal ?? false,
+    createdAt: input.createdAt ? new Date(input.createdAt) : stamp,
+    updatedAt: stamp
+  };
+}
+
+function isAmazonUrl(value?: string | null) {
+  if (!value) return false;
+  try {
+    const hostname = new URL(value).hostname.toLowerCase();
+    return hostname === "amazon.com" || hostname.endsWith(".amazon.com") || hostname.startsWith("amazon.");
+  } catch {
+    return false;
+  }
+}
+
+function amazonAffiliateUrl(productUrl: string, trackingTag: string) {
+  const tag = trackingTag.trim();
+  if (!tag || !isAmazonUrl(productUrl)) return "";
+  try {
+    const url = new URL(productUrl);
+    url.searchParams.set("tag", tag);
+    return url.toString();
+  } catch {
+    return "";
+  }
+}
+
+async function getActiveAmazonTrackingTag() {
+  const program = await prisma.affiliateProgram.findFirst({
+    where: {
+      active: true,
+      name: { contains: "Amazon" },
+      trackingId: { not: "" }
+    },
+    orderBy: { updatedAt: "desc" }
+  });
+  return program?.trackingId ?? "";
+}
+
+function normalizeAffiliateProgramInput(input: Partial<AffiliateProgram>, userId: string): Prisma.AffiliateProgramUncheckedCreateInput {
+  const stamp = new Date();
+  return {
+    id: input.id || `affiliate_${randomUUID()}`,
+    name: input.name?.trim() || "Amazon Associates",
+    trackingId: input.trackingId?.trim() || "",
+    defaultDomain: input.defaultDomain?.trim() || "amazon.com",
+    notes: input.notes?.trim() || "",
+    active: input.active ?? true,
+    createdByUserId: userId,
     createdAt: input.createdAt ? new Date(input.createdAt) : stamp,
     updatedAt: stamp
   };
@@ -447,7 +511,17 @@ export async function upsertGift(user: User, gift: GiftItem) {
     throw new Error("FORBIDDEN");
   }
 
-  const data = giftToDb(gift, user.id);
+  const amazonTag = gift.affiliateUrl ? "" : await getActiveAmazonTrackingTag();
+  const generatedAffiliateUrl = amazonAffiliateUrl(gift.productUrl || gift.originalUrl, amazonTag);
+  const data = giftToDb(
+    {
+      ...gift,
+      affiliateUrl: gift.affiliateUrl || generatedAffiliateUrl || undefined,
+      monetizedUrl: gift.affiliateUrl || generatedAffiliateUrl || gift.monetizedUrl,
+      affiliateStatus: generatedAffiliateUrl ? "converted" : gift.affiliateStatus
+    },
+    user.id
+  );
   const { id: _id, profileId: _profileId, createdByUserId: _createdByUserId, createdAt: _createdAt, ...updateData } = data;
   const saved = await prisma.giftItem.upsert({
     where: { id: gift.id },
@@ -599,6 +673,14 @@ export async function listActiveRecommendedProducts() {
 export async function upsertRecommendedProduct(user: User, input: Partial<RecommendedProduct>) {
   if (!userHasAdminAccess(user)) throw new Error("FORBIDDEN");
   const data = normalizeRecommendedProductInput(input, user.id);
+  if (!data.affiliateUrl && isAmazonUrl(data.originalUrl)) {
+    const generated = amazonAffiliateUrl(data.originalUrl, await getActiveAmazonTrackingTag());
+    if (generated) {
+      data.affiliateUrl = generated;
+      data.affiliateProgram = data.affiliateProgram || "Amazon Associates";
+      data.affiliateStatus = "matched";
+    }
+  }
   const { id, createdAt: _createdAt, createdByUserId: _createdByUserId, ...updateData } = data;
   const saved = await prisma.recommendedProduct.upsert({
     where: { id },
@@ -622,20 +704,36 @@ export async function getAdminOverview(user: User): Promise<AdminOverview> {
     totalGifts,
     totalProfiles,
     recommendedProductCount,
+    affiliateProgramCount,
     recommendedProducts,
+    affiliatePrograms,
     allGifts,
+    wishlists,
     users
   ] = await Promise.all([
     prisma.user.count(),
     prisma.giftItem.count(),
     prisma.profile.count(),
     prisma.recommendedProduct.count(),
+    prisma.affiliateProgram.count(),
     prisma.recommendedProduct.findMany({
       orderBy: [{ active: "desc" }, { featured: "desc" }, { updatedAt: "desc" }]
     }),
+    prisma.affiliateProgram.findMany({
+      orderBy: [{ active: "desc" }, { updatedAt: "desc" }]
+    }),
     prisma.giftItem.findMany({
       orderBy: { createdAt: "desc" },
-      take: 200
+      take: 250,
+      include: { profile: { include: { owner: true } } }
+    }),
+    prisma.profile.findMany({
+      orderBy: [{ updatedAt: "desc" }],
+      take: 250,
+      include: {
+        owner: true,
+        _count: { select: { gifts: true } }
+      }
     }),
     prisma.user.findMany({
       select: {
@@ -672,15 +770,18 @@ export async function getAdminOverview(user: User): Promise<AdminOverview> {
   }
 
   return {
+    currentUserId: user.id,
     metrics: {
       totalUsers,
       totalGifts,
       totalProfiles,
       recommendedProducts: recommendedProductCount,
+      affiliatePrograms: affiliateProgramCount,
       productsWithAffiliateLinks,
       productsMissingAffiliateLinks
     },
     recommendedProducts: recommended,
+    affiliatePrograms: affiliatePrograms.map(toAffiliateProgram),
     unmatchedGifts: giftsMissingAffiliate.slice(0, 20).map((gift) => ({
       id: gift.id,
       title: gift.title,
@@ -691,6 +792,31 @@ export async function getAdminOverview(user: User): Promise<AdminOverview> {
       createdAt: dateString(gift.createdAt)
     })),
     mostAddedProducts: Array.from(addedMap.values()).sort((a, b) => b.count - a.count).slice(0, 8),
+    wishlists: wishlists.map((profile) => ({
+      id: profile.id,
+      displayName: profile.displayName,
+      slug: profile.slug,
+      relationship: profile.relationship,
+      listVisibility: profile.listVisibility === "shared" ? "shared" : "private",
+      isPrimary: profile.isPrimary,
+      createdAt: dateString(profile.createdAt),
+      ownerName: profile.owner.name,
+      ownerEmail: profile.owner.email,
+      giftCount: profile._count.gifts
+    })),
+    gifts: allGifts.slice(0, 100).map((gift) => ({
+      id: gift.id,
+      title: gift.title,
+      storeName: gift.storeName,
+      price: gift.price,
+      currency: gift.currency,
+      visibility: gift.visibility as GiftItem["visibility"],
+      affiliateUrl: gift.affiliateUrl ?? undefined,
+      affiliateStatus: gift.affiliateStatus as GiftItem["affiliateStatus"],
+      createdAt: dateString(gift.createdAt),
+      wishlistTitle: gift.profile.displayName,
+      ownerEmail: gift.profile.owner.email
+    })),
     users: users.map((adminUser) => ({
       id: adminUser.id,
       email: adminUser.email,
@@ -701,4 +827,29 @@ export async function getAdminOverview(user: User): Promise<AdminOverview> {
       createdAt: dateString(adminUser.createdAt)
     }))
   };
+}
+
+export async function upsertAffiliateProgram(user: User, input: Partial<AffiliateProgram>) {
+  if (!userHasAdminAccess(user)) throw new Error("FORBIDDEN");
+  const data = normalizeAffiliateProgramInput(input, user.id);
+  const { id, createdAt: _createdAt, createdByUserId: _createdByUserId, ...updateData } = data;
+  const saved = await prisma.affiliateProgram.upsert({
+    where: { id },
+    create: data,
+    update: updateData
+  });
+  return toAffiliateProgram(saved);
+}
+
+export async function deleteAffiliateProgram(user: User, id: string) {
+  if (!userHasAdminAccess(user)) throw new Error("FORBIDDEN");
+  await prisma.affiliateProgram.delete({ where: { id } });
+  return { ok: true };
+}
+
+export async function deleteAdminUser(admin: User, userId: string) {
+  if (!userHasAdminAccess(admin)) throw new Error("FORBIDDEN");
+  if (admin.id === userId) throw new Error("CANNOT_DELETE_SELF");
+  await prisma.user.delete({ where: { id: userId } });
+  return { ok: true };
 }

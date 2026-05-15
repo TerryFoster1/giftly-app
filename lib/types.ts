@@ -141,7 +141,20 @@ export type RecommendedProduct = {
   updatedAt: string;
 };
 
+export type AffiliateProgram = {
+  id: string;
+  name: string;
+  trackingId: string;
+  defaultDomain: string;
+  notes: string;
+  active: boolean;
+  createdByUserId?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type AdminOverview = {
+  currentUserId: string;
   metrics: {
     totalUsers: number;
     totalGifts: number;
@@ -149,10 +162,21 @@ export type AdminOverview = {
     recommendedProducts: number;
     productsWithAffiliateLinks: number;
     productsMissingAffiliateLinks: number;
+    affiliatePrograms: number;
   };
   recommendedProducts: RecommendedProduct[];
+  affiliatePrograms: AffiliateProgram[];
   unmatchedGifts: Array<Pick<GiftItem, "id" | "title" | "storeName" | "productUrl" | "affiliateUrl" | "affiliateStatus" | "createdAt">>;
   mostAddedProducts: Array<{ title: string; storeName: string; count: number }>;
+  wishlists: Array<Pick<Profile, "id" | "displayName" | "slug" | "relationship" | "listVisibility" | "isPrimary" | "createdAt"> & {
+    ownerName: string;
+    ownerEmail: string;
+    giftCount: number;
+  }>;
+  gifts: Array<Pick<GiftItem, "id" | "title" | "storeName" | "price" | "currency" | "visibility" | "affiliateUrl" | "affiliateStatus" | "createdAt"> & {
+    wishlistTitle: string;
+    ownerEmail: string;
+  }>;
   users: Array<{
     id: string;
     email: string;

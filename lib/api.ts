@@ -86,6 +86,9 @@ export async function withUser<T>(
     if (error instanceof Error && error.message === "SLUG_TAKEN") {
       return json({ message: "That vanity URL is already taken." }, 409);
     }
+    if (error instanceof Error && error.message === "CANNOT_DELETE_SELF") {
+      return json({ message: "You cannot delete your own admin account." }, 400);
+    }
     if (error instanceof Error && error.message === "AUTH_SECRET_REQUIRED") {
       return json({ message: "Server auth secret is not configured." }, 500);
     }
