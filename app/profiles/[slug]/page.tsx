@@ -1,5 +1,5 @@
 import { AppShell } from "@/components/shell";
-import { DashboardClient } from "@/components/dashboard-client";
+import { WishlistDetailClient } from "@/components/wishlist-detail-client";
 import { getCurrentUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 
@@ -8,7 +8,7 @@ export default async function ProfileDetailPage({ params }: { params: { slug: st
 
   return (
     <AppShell>
-      <DashboardClient initialSlug={params.slug} />
+      <WishlistDetailClient slug={params.slug} />
     </AppShell>
   );
 }
