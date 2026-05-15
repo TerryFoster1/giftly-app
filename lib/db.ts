@@ -1,12 +1,13 @@
 import { EventTag as DbEventTag, GroupLabel as DbGroupLabel, Prisma } from "@prisma/client";
 import { randomUUID } from "crypto";
 import { prisma } from "./prisma";
-import type { Connection, EventTag, GiftItem, GroupLabel, Profile, Reservation, User } from "./types";
+import type { AdminOverview, Connection, EventTag, GiftItem, GroupLabel, Profile, RecommendedProduct, Reservation, User } from "./types";
 
 type DbGift = Awaited<ReturnType<typeof prisma.giftItem.findFirst>>;
 type DbProfile = Awaited<ReturnType<typeof prisma.profile.findFirst>>;
 type DbReservation = Awaited<ReturnType<typeof prisma.reservation.findFirst>>;
 type DbConnection = Awaited<ReturnType<typeof prisma.connection.findFirst>>;
+type DbRecommendedProduct = Awaited<ReturnType<typeof prisma.recommendedProduct.findFirst>>;
 
 const eventToDb: Record<EventTag, string> = {
   Birthday: "Birthday",
@@ -152,6 +153,33 @@ export function toReservation(reservation: NonNullable<DbReservation>): Reservat
   };
 }
 
+export function toRecommendedProduct(product: NonNullable<DbRecommendedProduct>): RecommendedProduct {
+  return {
+    id: product.id,
+    createdByUserId: product.createdByUserId ?? undefined,
+    title: product.title,
+    description: product.description,
+    imageUrl: product.imageUrl,
+    originalUrl: product.originalUrl,
+    affiliateUrl: product.affiliateUrl ?? undefined,
+    affiliateProgram: product.affiliateProgram ?? undefined,
+    affiliateStatus: product.affiliateStatus as RecommendedProduct["affiliateStatus"],
+    affiliateNotes: product.affiliateNotes ?? undefined,
+    price: product.price,
+    currency: product.currency,
+    storeName: product.storeName,
+    category: product.category,
+    tags: product.tags,
+    targetAudienceNotes: product.targetAudienceNotes,
+    active: product.active,
+    featured: product.featured,
+    hot: product.hot,
+    seasonal: product.seasonal,
+    createdAt: dateString(product.createdAt),
+    updatedAt: dateString(product.updatedAt)
+  };
+}
+
 function giftToDb(gift: GiftItem, userId: string): Prisma.GiftItemUncheckedCreateInput {
   return {
     id: gift.id,
@@ -193,13 +221,42 @@ function giftToDb(gift: GiftItem, userId: string): Prisma.GiftItemUncheckedCreat
   };
 }
 
-export function toSafeUser(user: { id: string; email: string; name: string; createdAt: Date | string; updatedAt: Date | string }): User {
+export function toSafeUser(user: { id: string; email: string; name: string; isAdmin?: boolean; createdAt: Date | string; updatedAt: Date | string }): User {
   return {
     id: user.id,
     email: user.email,
     name: user.name,
+    isAdmin: user.isAdmin,
     createdAt: dateString(user.createdAt),
     updatedAt: dateString(user.updatedAt)
+  };
+}
+
+function normalizeRecommendedProductInput(input: Partial<RecommendedProduct>, userId: string): Prisma.RecommendedProductUncheckedCreateInput {
+  const stamp = new Date();
+  return {
+    id: input.id || `recommended_${randomUUID()}`,
+    createdByUserId: userId,
+    title: input.title?.trim() || "Untitled gift idea",
+    description: input.description?.trim() || "",
+    imageUrl: input.imageUrl?.trim() || "https://images.unsplash.com/photo-1513201099705-a9746e1e201f?q=80&w=600&auto=format&fit=crop",
+    originalUrl: input.originalUrl?.trim() || "",
+    affiliateUrl: input.affiliateUrl?.trim() || null,
+    affiliateProgram: input.affiliateProgram?.trim() || null,
+    affiliateStatus: input.affiliateStatus || "none",
+    affiliateNotes: input.affiliateNotes?.trim() || null,
+    price: Number.isFinite(Number(input.price)) ? Number(input.price) : 0,
+    currency: input.currency?.trim().toUpperCase() || "",
+    storeName: input.storeName?.trim() || "Curated source",
+    category: input.category?.trim() || "General",
+    tags: input.tags?.trim() || "",
+    targetAudienceNotes: input.targetAudienceNotes?.trim() || "",
+    active: input.active ?? true,
+    featured: input.featured ?? false,
+    hot: input.hot ?? false,
+    seasonal: input.seasonal ?? false,
+    createdAt: input.createdAt ? new Date(input.createdAt) : stamp,
+    updatedAt: stamp
   };
 }
 
@@ -523,4 +580,120 @@ export async function createContributionPlaceholder(user: User, input: {
       status: "placeholder"
     }
   });
+}
+
+export async function listActiveRecommendedProducts() {
+  const products = await prisma.recommendedProduct.findMany({
+    where: { active: true },
+    orderBy: [{ featured: "desc" }, { hot: "desc" }, { seasonal: "desc" }, { updatedAt: "desc" }],
+    take: 9
+  });
+  return products.map(toRecommendedProduct);
+}
+
+export async function upsertRecommendedProduct(user: User, input: Partial<RecommendedProduct>) {
+  if (!user.isAdmin) throw new Error("FORBIDDEN");
+  const data = normalizeRecommendedProductInput(input, user.id);
+  const { id, createdAt: _createdAt, createdByUserId: _createdByUserId, ...updateData } = data;
+  const saved = await prisma.recommendedProduct.upsert({
+    where: { id },
+    create: data,
+    update: updateData
+  });
+  return toRecommendedProduct(saved);
+}
+
+export async function deleteRecommendedProduct(user: User, id: string) {
+  if (!user.isAdmin) throw new Error("FORBIDDEN");
+  await prisma.recommendedProduct.delete({ where: { id } });
+  return { ok: true };
+}
+
+export async function getAdminOverview(user: User): Promise<AdminOverview> {
+  if (!user.isAdmin) throw new Error("FORBIDDEN");
+
+  const [
+    totalUsers,
+    totalGifts,
+    totalProfiles,
+    recommendedProductCount,
+    recommendedProducts,
+    allGifts,
+    users
+  ] = await Promise.all([
+    prisma.user.count(),
+    prisma.giftItem.count(),
+    prisma.profile.count(),
+    prisma.recommendedProduct.count(),
+    prisma.recommendedProduct.findMany({
+      orderBy: [{ active: "desc" }, { featured: "desc" }, { updatedAt: "desc" }]
+    }),
+    prisma.giftItem.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 200
+    }),
+    prisma.user.findMany({
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        isAdmin: true,
+        createdAt: true,
+        _count: {
+          select: {
+            ownedProfiles: true,
+            gifts: true
+          }
+        }
+      },
+      orderBy: { createdAt: "desc" },
+      take: 50
+    })
+  ]);
+
+  const recommended = recommendedProducts.map(toRecommendedProduct);
+  const missingAffiliateRecommended = recommended.filter((product) => !product.affiliateUrl);
+  const giftsMissingAffiliate = allGifts.filter((gift) => !gift.affiliateUrl);
+  const giftsWithAffiliate = allGifts.filter((gift) => gift.affiliateUrl).length;
+  const productsWithAffiliateLinks = giftsWithAffiliate + recommended.filter((product) => Boolean(product.affiliateUrl)).length;
+  const productsMissingAffiliateLinks = giftsMissingAffiliate.length + missingAffiliateRecommended.length;
+  const addedMap = new Map<string, { title: string; storeName: string; count: number }>();
+
+  for (const gift of allGifts) {
+    const key = `${gift.title.toLowerCase()}|${gift.storeName.toLowerCase()}`;
+    const current = addedMap.get(key) ?? { title: gift.title, storeName: gift.storeName, count: 0 };
+    current.count += 1;
+    addedMap.set(key, current);
+  }
+
+  return {
+    metrics: {
+      totalUsers,
+      totalGifts,
+      totalProfiles,
+      recommendedProducts: recommendedProductCount,
+      productsWithAffiliateLinks,
+      productsMissingAffiliateLinks
+    },
+    recommendedProducts: recommended,
+    unmatchedGifts: giftsMissingAffiliate.slice(0, 20).map((gift) => ({
+      id: gift.id,
+      title: gift.title,
+      storeName: gift.storeName,
+      productUrl: gift.productUrl,
+      affiliateUrl: gift.affiliateUrl ?? undefined,
+      affiliateStatus: gift.affiliateStatus as GiftItem["affiliateStatus"],
+      createdAt: dateString(gift.createdAt)
+    })),
+    mostAddedProducts: Array.from(addedMap.values()).sort((a, b) => b.count - a.count).slice(0, 8),
+    users: users.map((adminUser) => ({
+      id: adminUser.id,
+      email: adminUser.email,
+      name: adminUser.name,
+      isAdmin: adminUser.isAdmin,
+      profileCount: adminUser._count.ownedProfiles,
+      giftCount: adminUser._count.gifts,
+      createdAt: dateString(adminUser.createdAt)
+    }))
+  };
 }

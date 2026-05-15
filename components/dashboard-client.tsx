@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { CalendarDays, Plus, Share2, Sparkles, UsersRound, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { CalendarDays, ExternalLink, Plus, Share2, Sparkles, UsersRound, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { useGiftlyStore } from "@/lib/store";
 import { getUpcomingProfileEvents } from "@/lib/events";
-import { type GiftItem, type GroupLabel, type Profile } from "@/lib/types";
+import { type GiftItem, type GroupLabel, type Profile, type RecommendedProduct } from "@/lib/types";
 import { normalizeProductUrl } from "@/lib/product-url";
 import { publicProfileUrl } from "@/lib/url";
 import { InviteModal } from "./invite-modal";
@@ -93,6 +93,7 @@ export function DashboardClient() {
   const [createNewList, setCreateNewList] = useState(false);
   const [newListName, setNewListName] = useState("");
   const [shareOpen, setShareOpen] = useState(false);
+  const [recommendedProducts, setRecommendedProducts] = useState<RecommendedProduct[]>([]);
 
   const primaryProfile = profiles.find((profile) => profile.isPrimary) ?? profiles[0];
   const upcomingEvents = useMemo(() => getUpcomingProfileEvents(profiles).slice(0, 3), [profiles]);
@@ -116,6 +117,13 @@ export function DashboardClient() {
         (group.title === "Family" ? profiles.length : 0)
     }));
   }, [connections, existingGroupNames, profiles.length]);
+
+  useEffect(() => {
+    fetch("/api/recommended-products", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : []))
+      .then((products: RecommendedProduct[]) => setRecommendedProducts(products))
+      .catch(() => setRecommendedProducts([]));
+  }, []);
 
   function openFastAdd() {
     setFastError("");
@@ -388,12 +396,38 @@ export function DashboardClient() {
         <p className="text-sm font-semibold leading-6 text-ink/60">
           Discover thoughtful gifts for upcoming events, shared wishlists, and the people you plan for most.
         </p>
-        <div className="grid gap-2 sm:grid-cols-3">
-          {["For birthdays", "For weddings", "Popular saves"].map((label) => (
-            <div className="rounded-2xl bg-cloud p-3 text-sm font-black text-ink/65" key={label}>
-              {label}
-            </div>
-          ))}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {recommendedProducts.length ? (
+            recommendedProducts.slice(0, 6).map((product) => (
+              <article className="overflow-hidden rounded-2xl border border-ink/10 bg-white shadow-sm" key={product.id}>
+                <img src={product.imageUrl} alt="" className="aspect-[5/3] w-full object-cover" />
+                <div className="grid gap-2 p-3">
+                  <div>
+                    <p className="text-xs font-black uppercase text-berry">{product.category || "Gift idea"}</p>
+                    <h3 className="font-black leading-tight">{product.title}</h3>
+                    <p className="text-xs font-bold text-ink/55">
+                      {product.storeName} {product.price ? `/ ${product.currency ? `${product.currency} ` : ""}$${product.price.toFixed(2)}` : ""}
+                    </p>
+                  </div>
+                  <p className="text-xs font-semibold leading-5 text-ink/60">{product.description}</p>
+                  <a
+                    className="focus-ring inline-flex min-h-9 items-center justify-center gap-2 rounded-2xl bg-coral px-3 text-xs font-black text-white hover:bg-berry"
+                    href={product.affiliateUrl || product.originalUrl}
+                    target="_blank"
+                  >
+                    <ExternalLink size={13} />
+                    Buy Now
+                  </a>
+                </div>
+              </article>
+            ))
+          ) : (
+            ["For birthdays", "For weddings", "Popular saves"].map((label) => (
+              <div className="rounded-2xl bg-cloud p-3 text-sm font-black text-ink/65" key={label}>
+                {label}
+              </div>
+            ))
+          )}
         </div>
       </section>
 

@@ -9,6 +9,7 @@ const demoUser = {
   email: "demo@giftly.local",
   name: "Kathryn",
   passwordHash: `scrypt:giftly_demo_salt:${scryptSync("giftly-demo-123", "giftly_demo_salt", 64).toString("hex")}`,
+  isAdmin: true,
   createdAt: now,
   updatedAt: now
 };
@@ -158,10 +159,62 @@ const gifts = [
   }
 ];
 
+const recommendedProducts = [
+  {
+    id: "recommended_cozy_throw",
+    createdByUserId: demoUser.id,
+    title: "Cozy weighted throw blanket",
+    description: "A soft, calming gift for movie nights, winter birthdays, and people who like useful comfort.",
+    imageUrl: "https://images.unsplash.com/photo-1519710164239-da123dc03ef4?q=80&w=800&auto=format&fit=crop",
+    originalUrl: "https://example.com/cozy-throw",
+    affiliateUrl: null,
+    affiliateProgram: null,
+    affiliateStatus: "needs_review",
+    affiliateNotes: "Potential home goods affiliate program later. No credentials stored.",
+    price: 79,
+    currency: "USD",
+    storeName: "Home Goods",
+    category: "Cozy gifts",
+    tags: "cozy,home,winter",
+    targetAudienceNotes: "Parents, partners, friends, housewarming",
+    active: true,
+    featured: true,
+    hot: false,
+    seasonal: true,
+    createdAt: now,
+    updatedAt: now
+  },
+  {
+    id: "recommended_kids_science",
+    createdByUserId: demoUser.id,
+    title: "Kitchen science experiment kit",
+    description: "A hands-on activity gift for kids who like building, mixing, and figuring out how things work.",
+    imageUrl: "https://images.unsplash.com/photo-1532094349884-543bc11b234d?q=80&w=800&auto=format&fit=crop",
+    originalUrl: "https://example.com/science-kit",
+    affiliateUrl: "https://example.com/science-kit?tag=giftly-demo",
+    affiliateProgram: "Demo affiliate tag",
+    affiliateStatus: "manual",
+    affiliateNotes: "Demo tracking URL only.",
+    price: 39,
+    currency: "USD",
+    storeName: "Learning Store",
+    category: "Kids",
+    tags: "kids,science,birthday",
+    targetAudienceNotes: "Kids ages 8-12, birthdays, holidays",
+    active: true,
+    featured: false,
+    hot: true,
+    seasonal: false,
+    createdAt: now,
+    updatedAt: now
+  }
+];
+
 async function main() {
   await prisma.contributionPlaceholder.deleteMany();
   await prisma.session.deleteMany();
   await prisma.connection.deleteMany();
+  await prisma.recommendedProduct.deleteMany();
   await prisma.reservation.deleteMany();
   await prisma.giftItem.deleteMany();
   await prisma.profile.deleteMany();
@@ -170,6 +223,7 @@ async function main() {
   await prisma.user.create({ data: demoUser });
   await prisma.profile.createMany({ data: profiles });
   await prisma.giftItem.createMany({ data: gifts });
+  await prisma.recommendedProduct.createMany({ data: recommendedProducts });
   await prisma.reservation.create({
     data: {
       id: "reservation_mug",

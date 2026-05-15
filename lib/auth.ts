@@ -20,6 +20,14 @@ function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
+function isConfiguredAdminEmail(email: string) {
+  return (process.env.ADMIN_EMAILS || "")
+    .split(",")
+    .map((value) => normalizeEmail(value))
+    .filter(Boolean)
+    .includes(normalizeEmail(email));
+}
+
 function parseCookieHeader(header: string | null) {
   const values = new Map<string, string>();
   if (!header) return values;
@@ -187,6 +195,7 @@ export async function getCurrentUser(request?: Request) {
     id: session.user.id,
     email: session.user.email,
     name: session.user.name,
+    isAdmin: session.user.isAdmin || isConfiguredAdminEmail(session.user.email),
     createdAt: session.user.createdAt.toISOString(),
     updatedAt: session.user.updatedAt.toISOString()
   };

@@ -12,11 +12,13 @@ export type ReservationStatus = "available" | "reserved";
 export type GroupLabel = "FAMILY" | "FRIENDS" | "PARTNER" | "GUESTS" | "CUSTOM";
 export type ConnectionStatus = "PENDING" | "ACCEPTED" | "REJECTED";
 export type PrimaryEventType = "BIRTHDAY" | "WEDDING" | "BABY" | "GENERAL";
+export type RecommendedAffiliateStatus = "none" | "matched" | "needs_review" | "manual";
 
 export type User = {
   id: string;
   email: string;
   name: string;
+  isAdmin?: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -111,6 +113,54 @@ export type Contribution = {
   stripePaymentIntentId?: string;
   createdAt: string;
   updatedAt: string;
+};
+
+export type RecommendedProduct = {
+  id: string;
+  createdByUserId?: string;
+  title: string;
+  description: string;
+  imageUrl: string;
+  originalUrl: string;
+  affiliateUrl?: string;
+  affiliateProgram?: string;
+  affiliateStatus: RecommendedAffiliateStatus;
+  affiliateNotes?: string;
+  price: number;
+  currency: string;
+  storeName: string;
+  category: string;
+  tags: string;
+  targetAudienceNotes: string;
+  active: boolean;
+  featured: boolean;
+  hot: boolean;
+  seasonal: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AdminOverview = {
+  metrics: {
+    totalUsers: number;
+    totalGifts: number;
+    totalProfiles: number;
+    recommendedProducts: number;
+    productsWithAffiliateLinks: number;
+    productsMissingAffiliateLinks: number;
+  };
+  recommendedProducts: RecommendedProduct[];
+  unmatchedGifts: Array<Pick<GiftItem, "id" | "title" | "storeName" | "productUrl" | "affiliateUrl" | "affiliateStatus" | "createdAt">>;
+  mostAddedProducts: Array<{ title: string; storeName: string; count: number }>;
+  users: Array<{
+    id: string;
+    email: string;
+    name: string;
+    isAdmin: boolean;
+    profileCount: number;
+    giftCount: number;
+    createdAt: string;
+  }>;
 };
 
 export const eventTags: EventTag[] = [
