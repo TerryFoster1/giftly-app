@@ -79,6 +79,7 @@ export function toProfile(profile: NonNullable<DbProfile>): Profile {
     birthday: profile.birthday ? dateString(profile.birthday) : undefined,
     anniversary: profile.anniversary ? dateString(profile.anniversary) : undefined,
     primaryEventType: profile.primaryEventType ?? undefined,
+    listVisibility: profile.listVisibility === "shared" ? "shared" : "private",
     isPrimary: profile.isPrimary,
     isManagedProfile: profile.isManagedProfile,
     createdAt: dateString(profile.createdAt),
@@ -304,6 +305,7 @@ export async function createManagedProfile(
   input: Pick<Profile, "displayName" | "relationship" | "bio" | "photoUrl" | "birthday" | "anniversary"> & {
     groupLabel?: GroupLabel;
     customGroupLabel?: string;
+    listVisibility?: "private" | "shared";
   }
 ) {
   const stamp = new Date();
@@ -321,6 +323,7 @@ export async function createManagedProfile(
       birthday: input.birthday ? new Date(input.birthday) : null,
       anniversary: input.anniversary ? new Date(input.anniversary) : null,
       primaryEventType: input.birthday ? "BIRTHDAY" : null,
+      listVisibility: input.listVisibility === "shared" ? "shared" : "private",
       isPrimary: false,
       isManagedProfile: true,
       createdAt: stamp,
@@ -385,6 +388,7 @@ export async function createDefaultProfile(user: User) {
       birthday: null,
       anniversary: null,
       primaryEventType: null,
+      listVisibility: "shared",
       isPrimary: true,
       isManagedProfile: false,
       createdAt: stamp,

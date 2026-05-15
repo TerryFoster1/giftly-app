@@ -35,6 +35,7 @@ export type Profile = {
   birthday?: string;
   anniversary?: string;
   primaryEventType?: PrimaryEventType;
+  listVisibility: "private" | "shared";
   isPrimary: boolean;
   isManagedProfile: boolean;
   createdAt: string;

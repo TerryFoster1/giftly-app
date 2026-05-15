@@ -106,7 +106,7 @@ export function useGiftlyStore() {
 
   const actions = useMemo(
     () => ({
-      async createProfile(profile: Pick<Profile, "displayName" | "relationship" | "bio" | "photoUrl" | "birthday" | "anniversary"> & { groupLabel?: GroupLabel; customGroupLabel?: string }) {
+      async createProfile(profile: Pick<Profile, "displayName" | "relationship" | "bio" | "photoUrl" | "birthday" | "anniversary"> & { groupLabel?: GroupLabel; customGroupLabel?: string; listVisibility?: "private" | "shared" }) {
         return runAction(async () => {
           const created = await requestJson<Profile>("/api/profiles", {
             method: "POST",

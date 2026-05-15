@@ -50,6 +50,7 @@ model Profile {
   birthday    DateTime?
   anniversary DateTime?
   primaryEventType PrimaryEventType?
+  listVisibility Visibility @default(private)
   isPrimary   Boolean    @default(false)
   isManagedProfile Boolean @default(true)
   gifts       GiftItem[]

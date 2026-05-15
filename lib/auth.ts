@@ -20,6 +20,15 @@ function normalizeEmail(email: string) {
   return email.trim().replace(/^["']|["']$/g, "").toLowerCase();
 }
 
+function slugify(value: string) {
+  return (
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "") || "wishlist"
+  );
+}
+
 function isConfiguredAdminEmail(email: string) {
   return [process.env.ADMIN_EMAILS, process.env.ADMIN_EMAIL, process.env.GIFTLY_ADMIN_EMAILS]
     .filter(Boolean)
@@ -233,7 +242,8 @@ export async function signUpWithPassword(input: { name: string; email: string; p
       }
     });
 
-    const slug = `${baseSlug}-${createdUser.id.slice(-6).toLowerCase()}`;
+    const suffix = createdUser.id.slice(-6).toLowerCase();
+    const slug = `${baseSlug}-${suffix}`;
     await tx.profile.create({
       data: {
         id: `profile_${randomUUID()}`,
@@ -244,9 +254,40 @@ export async function signUpWithPassword(input: { name: string; email: string; p
         relationship: "Me",
         photoUrl: null,
         bio: "",
+        listVisibility: "shared",
         isPrimary: true,
         isManagedProfile: false
       }
+    });
+    await tx.profile.createMany({
+      data: [
+        {
+          id: `profile_${randomUUID()}`,
+          ownerUserId: createdUser.id,
+          linkedUserId: null,
+          displayName: "My Birthday",
+          slug: `${slugify(`${name} birthday`)}-${suffix}`,
+          relationship: "Wishlist",
+          photoUrl: null,
+          bio: "A simple place for birthday gift ideas.",
+          listVisibility: "shared",
+          isPrimary: false,
+          isManagedProfile: true
+        },
+        {
+          id: `profile_${randomUUID()}`,
+          ownerUserId: createdUser.id,
+          linkedUserId: null,
+          displayName: "Cool Stuff",
+          slug: `${slugify(`${name} cool stuff`)}-${suffix}`,
+          relationship: "Wishlist",
+          photoUrl: null,
+          bio: "Private saves for gift inspiration, someday ideas, and things worth remembering.",
+          listVisibility: "private",
+          isPrimary: false,
+          isManagedProfile: true
+        }
+      ]
     });
 
     return createdUser;

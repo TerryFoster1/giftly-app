@@ -50,6 +50,7 @@ function storeFromUrl(url: string) {
 
 function wishlistVisibility(profile: Profile, gifts: GiftItem[]) {
   const profileGifts = gifts.filter((gift) => gift.profileId === profile.id);
+  if (profile.listVisibility === "shared") return "shared";
   return profileGifts.some((gift) => gift.visibility !== "private") ? "shared" : "private";
 }
 
@@ -72,6 +73,10 @@ export function DashboardClient() {
   const [fastVisibility, setFastVisibility] = useState<"private" | "shared">("private");
   const [createNewList, setCreateNewList] = useState(false);
   const [newListName, setNewListName] = useState("");
+  const [createListOpen, setCreateListOpen] = useState(false);
+  const [standaloneListName, setStandaloneListName] = useState("");
+  const [standaloneListVisibility, setStandaloneListVisibility] = useState<"private" | "shared">("shared");
+  const [createListSaving, setCreateListSaving] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [recommendedProducts, setRecommendedProducts] = useState<RecommendedProduct[]>([]);
 
@@ -148,7 +153,8 @@ export function DashboardClient() {
             photoUrl: "",
             birthday: "",
             anniversary: "",
-            groupLabel: "FAMILY"
+            groupLabel: "FAMILY",
+            listVisibility: fastVisibility
           })
         : profiles.find((profile) => profile.id === fastProfileId);
 
@@ -205,6 +211,37 @@ export function DashboardClient() {
   async function saveInvite(input: { emailOrPhone?: string; groupLabel: GroupLabel; customGroupLabel?: string }) {
     await actions.createConnection(input);
     await actions.refresh();
+  }
+
+  async function createStandaloneWishlist() {
+    setFastError("");
+    if (!standaloneListName.trim()) {
+      setFastError("Name the new wishlist first.");
+      return;
+    }
+
+    setCreateListSaving(true);
+    try {
+      const created = await actions.createProfile({
+        displayName: standaloneListName.trim(),
+        relationship: "Wishlist",
+        bio: "",
+        photoUrl: "",
+        birthday: "",
+        anniversary: "",
+        groupLabel: "FAMILY",
+        listVisibility: standaloneListVisibility
+      });
+      await actions.refresh();
+      setCreateListOpen(false);
+      setStandaloneListName("");
+      setStandaloneListVisibility("shared");
+      setGiftMessage(`${created.displayName} created.`);
+    } catch (error) {
+      setFastError(error instanceof Error ? error.message : "Wishlist could not be created.");
+    } finally {
+      setCreateListSaving(false);
+    }
   }
 
   if (!ready) {
@@ -294,13 +331,35 @@ export function DashboardClient() {
                 </div>
                 <div>
                   <h3 className="text-lg font-black">{profile.displayName}</h3>
-                  <p className="text-sm font-bold text-ink/55">
-                    {profileGifts.length} {profileGifts.length === 1 ? "item" : "items"} · {status}
-                  </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-bold text-ink/55">
+                      {profileGifts.length} {profileGifts.length === 1 ? "item" : "items"}
+                    </p>
+                    <span className={`rounded-full px-2.5 py-1 text-[11px] font-black capitalize ${status === "shared" ? "bg-mint text-spruce" : "bg-cloud text-ink/60"}`}>
+                      {status}
+                    </span>
+                  </div>
                 </div>
               </Link>
             );
           })}
+          <button
+            type="button"
+            className="focus-ring grid gap-3 rounded-[1.5rem] border border-dashed border-ink/20 bg-white p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft"
+            onClick={() => {
+              setFastError("");
+              setCreateListOpen(true);
+            }}
+          >
+            <div className="grid aspect-[4/3] place-items-center rounded-2xl bg-cloud text-berry">
+              <Plus size={28} />
+            </div>
+            <div>
+              <h3 className="text-lg font-black">Add New List</h3>
+              <p className="mt-1 text-sm font-semibold leading-6 text-ink/60">Start a wishlist for an event, person, or idea you want to remember.</p>
+            </div>
+            <span className="w-fit rounded-full bg-blush px-3 py-1 text-xs font-black text-berry">Create list</span>
+          </button>
         </div>
       </section>
 
@@ -459,6 +518,44 @@ export function DashboardClient() {
               {fastError ? <p className="rounded-2xl bg-blush p-3 text-sm font-bold text-berry">{fastError}</p> : null}
               <Button type="button" onClick={saveFastGift} disabled={fastSaving}>
                 {fastSaving ? "Saving..." : "Save gift"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {createListOpen ? (
+        <div className="fixed inset-0 z-40 grid place-items-end bg-ink/40 p-0 sm:place-items-center sm:p-4">
+          <div className="max-h-[92vh] w-full max-w-lg overflow-auto rounded-t-[2rem] bg-white p-4 shadow-soft sm:rounded-[2rem]">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-black uppercase text-berry">New wishlist</p>
+                <h2 className="text-xl font-black">Create a list</h2>
+              </div>
+              <Button type="button" variant="ghost" onClick={() => setCreateListOpen(false)} aria-label="Close">
+                <X size={16} />
+              </Button>
+            </div>
+            <div className="mt-4 grid gap-3">
+              <Field label="List title">
+                <Input
+                  placeholder="My Birthday"
+                  value={standaloneListName}
+                  onChange={(event) => setStandaloneListName(event.target.value)}
+                />
+              </Field>
+              <Field label="List privacy">
+                <Select value={standaloneListVisibility} onChange={(event) => setStandaloneListVisibility(event.target.value as "private" | "shared")}>
+                  <option value="shared">Shared</option>
+                  <option value="private">Private</option>
+                </Select>
+              </Field>
+              <p className="rounded-2xl bg-cloud p-3 text-xs font-bold leading-5 text-ink/60">
+                Group selection is coming later. For now, shared lists are ready for your public Giftly profile and private lists stay personal.
+              </p>
+              {fastError ? <p className="rounded-2xl bg-blush p-3 text-sm font-bold text-berry">{fastError}</p> : null}
+              <Button type="button" onClick={createStandaloneWishlist} disabled={createListSaving}>
+                {createListSaving ? "Creating..." : "Create list"}
               </Button>
             </div>
           </div>
