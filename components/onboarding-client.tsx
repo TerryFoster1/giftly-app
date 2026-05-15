@@ -231,7 +231,7 @@ export function OnboardingClient() {
           <h2 className="text-xl font-black">Invite loop foundation</h2>
         </div>
         <p className="text-sm font-semibold leading-6 text-ink/60">
-          Your profile link is ready to copy or share now. Email and SMS sending can plug into these pending connections later.
+          Your Giftly link is ready to copy or share now. Email and SMS sending can plug into these pending connections later.
         </p>
         <div className="grid gap-2 rounded-3xl bg-cloud p-3 sm:grid-cols-[1fr_auto_auto]">
           <Input readOnly value={shareUrl} />

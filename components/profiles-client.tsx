@@ -34,7 +34,7 @@ export function ProfilesClient() {
     customGroupLabel: ""
   });
 
-  if (!ready) return <main className="mx-auto max-w-6xl px-4 py-10 font-bold">Loading profiles…</main>;
+  if (!ready) return <main className="mx-auto max-w-6xl px-4 py-10 font-bold">Loading your gift circle...</main>;
 
   async function createProfile(event: React.FormEvent) {
     event.preventDefault();
@@ -65,7 +65,7 @@ export function ProfilesClient() {
   }
 
   async function deleteProfile(id: string, name: string) {
-    if (!window.confirm(`Delete ${name}? This will also delete that profile's gift items, reservations, and contribution records.`)) return;
+    if (!window.confirm(`Delete ${name}? This will also delete that gift account's items, reservations, and contribution records.`)) return;
     try {
       await actions.deleteProfile(id);
       if (profiles.find((profile) => profile.id === id)?.slug === shareSlug) setShareSlug("");
@@ -103,7 +103,7 @@ export function ProfilesClient() {
     };
     try {
       await actions.updateProfileEvents(profileId, draft);
-      setEventMessage("Profile dates saved.");
+      setEventMessage("Gift account dates saved.");
     } catch {
       // The shared store surfaces the friendly error message.
     }
@@ -136,12 +136,15 @@ export function ProfilesClient() {
         {actionError ? <p className="rounded-2xl bg-blush p-3 text-sm font-bold text-berry">{actionError}</p> : null}
         <div className="flex flex-col gap-4 rounded-[2rem] border border-ink/10 bg-white p-4 shadow-soft sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-sm font-black uppercase text-berry">Family profiles</p>
-            <h1 className="text-3xl font-black">Managed Wishlists</h1>
+            <p className="text-sm font-black uppercase text-berry">Your gifting circle</p>
+            <h1 className="text-3xl font-black">People You Gift For</h1>
+            <p className="mt-1 text-sm font-semibold leading-6 text-ink/60">
+              Create gift accounts for family and friends, add events, invite them later, and transfer ownership when they join Giftly.
+            </p>
           </div>
           <Button type="button" onClick={() => setShowForm((value) => !value)}>
             <Plus size={17} />
-            Create Profile
+            Add Person
           </Button>
         </div>
         <section className="rounded-[2rem] border border-berry/20 bg-white p-4 shadow-sm">
@@ -160,7 +163,7 @@ export function ProfilesClient() {
           {resetConfirmOpen ? (
             <div className="mt-4 rounded-2xl bg-blush p-4">
               <p className="text-sm font-bold leading-6 text-berry">
-                This will delete all your profiles, gift items, reservations, and contribution records. Your login account will remain.
+                This will delete all your gift accounts, gift items, reservations, and contribution records. Your login account will remain.
               </p>
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 <Button type="button" variant="ghost" onClick={() => setResetConfirmOpen(false)}>
@@ -177,7 +180,7 @@ export function ProfilesClient() {
           <form onSubmit={createProfile} className="grid gap-3 rounded-[2rem] border border-ink/10 bg-white p-4 shadow-soft">
             <Field label="Does this person already have a Giftly account?">
               <Select value={form.hasAccount} onChange={(event) => setForm({ ...form, hasAccount: event.target.value })}>
-                <option value="no">No, create a managed wishlist for them</option>
+                <option value="no">No, create a managed gift account for them</option>
                 <option value="yes">Yes, connect existing account</option>
               </Select>
             </Field>
@@ -254,16 +257,16 @@ export function ProfilesClient() {
                 </p>
               </>
             ) : null}
-            <Button type="submit">{form.hasAccount === "yes" ? "Create Pending Connection" : "Save Profile"}</Button>
+            <Button type="submit">{form.hasAccount === "yes" ? "Create Pending Connection" : "Save Gift Account"}</Button>
           </form>
         ) : null}
         {connections.length ? (
           <div className="rounded-[2rem] border border-ink/10 bg-white p-4 shadow-sm">
-            <h2 className="text-lg font-black">Connections</h2>
+            <h2 className="text-lg font-black">Invites and Connections</h2>
             <div className="mt-3 grid gap-2">
               {connections.map((connection) => (
                 <div className="rounded-2xl bg-cloud p-3 text-sm font-bold text-ink/65" key={connection.id}>
-                  {connection.emailOrPhone ?? "Managed profile"} · {connection.status} · {connection.groupLabel}
+                  {connection.emailOrPhone ?? "Managed gift account"} · {connection.status} · {connection.groupLabel}
                 </div>
               ))}
             </div>
@@ -338,7 +341,7 @@ export function ProfilesClient() {
                 </div>
               ) : profile.isManagedProfile ? (
                 <p className="mt-4 rounded-2xl bg-cloud p-3 text-xs font-bold text-ink/55">
-                  This is a managed wishlist. If this person joins Giftly later, they can connect to this profile and ownership can be transferred after a safe claim flow.
+                  This is a managed gift account. If this person joins Giftly later, they can connect to it and ownership can be transferred after a safe claim flow.
                 </p>
               ) : null}
               <div className="mt-4 grid gap-2 sm:grid-cols-4">
@@ -368,7 +371,7 @@ export function ProfilesClient() {
           <div className="rounded-[2rem] border border-ink/10 bg-white p-6 shadow-soft">
             <h2 className="text-xl font-black">QR sharing</h2>
             <p className="mt-2 font-semibold leading-7 text-ink/65">
-              Choose Share on any profile to generate a QR code and copyable public wishlist link.
+              Choose Share on any gift account to generate a QR code and copyable public wishlist link.
             </p>
           </div>
         )}

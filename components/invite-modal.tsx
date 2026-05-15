@@ -8,6 +8,15 @@ import { QrCard } from "./qr-card";
 
 const standardGroups = ["Family", "Friends"];
 
+function isStaleDemoGroup(label: string) {
+  const normalized = label.trim().toLowerCase();
+  return (
+    ["wedding", "household", "kids", "couples"].includes(normalized) ||
+    normalized.includes("brian") ||
+    normalized.includes("becky")
+  );
+}
+
 function connectionGroupFor(label: string): { groupLabel: GroupLabel; customGroupLabel?: string } {
   if (label === "Family") return { groupLabel: "FAMILY" };
   if (label === "Friends") return { groupLabel: "FRIENDS" };
@@ -33,7 +42,7 @@ export function InviteModal({ open, title = "Invite Friends & Family", profileUr
   const [saving, setSaving] = useState(false);
 
   const groupOptions = useMemo(() => {
-    const names = Array.from(new Set([...standardGroups, ...existingGroups].filter(Boolean)));
+    const names = Array.from(new Set([...standardGroups, ...existingGroups].filter((name) => Boolean(name) && !isStaleDemoGroup(name))));
     return names;
   }, [existingGroups]);
 

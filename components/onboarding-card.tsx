@@ -20,7 +20,7 @@ export function OnboardingCard({ userName, onboardingCompleted, wishlistCount, o
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    setVisible(!onboardingCompleted && window.localStorage.getItem(storageKey) !== "true");
+    setVisible(!onboardingCompleted);
   }, [onboardingCompleted]);
 
   function skip() {
@@ -35,10 +35,10 @@ export function OnboardingCard({ userName, onboardingCompleted, wishlistCount, o
     <section className="grid gap-4 rounded-[2rem] border border-ink/10 bg-white p-4 shadow-soft">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-black uppercase text-berry">Guided setup</p>
-          <h2 className="mt-1 text-2xl font-black">Make Giftly useful in five minutes.</h2>
+          <p className="text-sm font-black uppercase text-berry">Giftly walkthrough</p>
+          <h2 className="mt-1 text-2xl font-black">Build your gifting circle.</h2>
           <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-ink/60">
-            Start with who you save gifts for, keep your own birthday list ready to share, and invite people when you are ready.
+            Add the people you buy for, create a few wishlists, invite family or friends when it is useful, then save your first gift link.
           </p>
         </div>
         <Button type="button" variant="ghost" aria-label="Skip onboarding" onClick={skip}>
@@ -48,10 +48,10 @@ export function OnboardingCard({ userName, onboardingCompleted, wishlistCount, o
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          ["Who are you saving for?", `${userName || "You"} plus family and friends`, <UsersRound size={18} />],
-          ["Starter wishlists", wishlistCount >= 3 ? "My Birthday and Cool Stuff are ready" : "Create a few useful lists", <Gift size={18} />],
-          ["Birthdays and events", "Add dates so gift planning has context", <CheckCircle2 size={18} />],
-          ["Invite later", "Family and friends can join when it feels useful", <Plus size={18} />]
+          ["Add people", `${userName || "You"} plus family and friends`, <UsersRound size={18} />],
+          ["Create wishlists", wishlistCount >= 3 ? "My Birthday and Cool Stuff are ready" : "Create a few useful lists", <Gift size={18} />],
+          ["Add events", "Birthdays, anniversaries, weddings, and holidays give Giftly timing", <CheckCircle2 size={18} />],
+          ["Save first gift", "Paste a product link when an idea pops up", <Plus size={18} />]
         ].map(([title, copy, icon]) => (
           <div className="rounded-3xl bg-cloud p-3" key={String(title)}>
             <div className="mb-3 grid h-9 w-9 place-items-center rounded-2xl bg-white text-berry">{icon}</div>
@@ -70,7 +70,7 @@ export function OnboardingCard({ userName, onboardingCompleted, wishlistCount, o
           Add birthdays
         </Link>
         <Link className="focus-ring inline-flex min-h-11 items-center justify-center rounded-2xl border border-ink/10 bg-white px-4 py-2 text-sm font-extrabold text-ink hover:bg-blush" href="/onboarding">
-          Guided setup
+          Add people
         </Link>
         <Button type="button" variant="ghost" onClick={onInvite}>
           <UsersRound size={16} />
@@ -82,7 +82,7 @@ export function OnboardingCard({ userName, onboardingCompleted, wishlistCount, o
       </div>
 
       <p className="rounded-2xl bg-blush p-3 text-xs font-bold leading-5 text-berry">
-        Quick tour: paste a gift link, create or share a wishlist, invite family or friends, then view someone else's public wishlist when they share it with you.
+        Giftly works best as a circle: your wishlists, people you buy for, shared events, and quick saved links all in one place.
       </p>
     </section>
   );

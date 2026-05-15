@@ -65,7 +65,11 @@ function titleCaseGroup(value: string) {
 
 function isDemoGroupName(value: string) {
   const normalized = value.trim().toLowerCase();
-  return ["wedding", "household", "kids", "couples", "brian and becky's wedding", "brian & becky's wedding"].includes(normalized);
+  return (
+    ["wedding", "household", "kids", "couples"].includes(normalized) ||
+    normalized.includes("brian") ||
+    normalized.includes("becky")
+  );
 }
 
 export function DashboardClient() {
@@ -105,7 +109,10 @@ export function DashboardClient() {
     return foundationGiftGroups.map((group) => ({
       ...group,
       count:
-        connections.filter((connection) => (connection.customGroupLabel || titleCaseGroup(connection.groupLabel)) === group.title).length ||
+        connections.filter((connection) => {
+          const label = connection.customGroupLabel || titleCaseGroup(connection.groupLabel);
+          return label === group.title && !isDemoGroupName(label);
+        }).length ||
         (group.title === "Family" ? profiles.length : 0)
     }));
   }, [connections, profiles.length]);
@@ -272,7 +279,7 @@ export function DashboardClient() {
     return (
       <main className="mx-auto max-w-6xl px-4 py-10">
         <p className="rounded-2xl bg-blush p-3 text-sm font-bold text-berry">
-          {actionError || "No profiles are available yet."}
+          {actionError || "No gift accounts are available yet."}
         </p>
       </main>
     );
@@ -305,11 +312,11 @@ export function DashboardClient() {
         <div className="flex flex-col gap-2 sm:flex-row">
           <Button type="button" variant="secondary" onClick={() => openShareModal("existing")}>
             <Share2 size={16} />
-            Share your Giftly profile
+            Share your Giftly link
           </Button>
           <Button type="button" variant="ghost" onClick={() => openShareModal("existing")}>
             <UsersRound size={16} />
-            Invite family members
+            Invite family or friends
           </Button>
         </div>
       </section>
@@ -589,7 +596,7 @@ export function DashboardClient() {
                 </Select>
               </Field>
               <p className="rounded-2xl bg-cloud p-3 text-xs font-bold leading-5 text-ink/60">
-                Group selection is coming later. For now, shared lists are ready for your public Giftly profile and private lists stay personal.
+                Group selection is coming later. For now, shared lists are ready for your Giftly link and private lists stay personal.
               </p>
               {fastError ? <p className="rounded-2xl bg-blush p-3 text-sm font-bold text-berry">{fastError}</p> : null}
               <Button type="button" onClick={createStandaloneWishlist} disabled={createListSaving}>
@@ -602,7 +609,7 @@ export function DashboardClient() {
 
       <InviteModal
         open={shareOpen && Boolean(primaryProfile)}
-        title="Share your Giftly profile"
+        title="Share your Giftly link"
         profileUrl={primaryProfile ? publicProfileUrl(primaryProfile.slug) : ""}
         existingGroups={existingGroupNames}
         initialMode={shareInitialMode}

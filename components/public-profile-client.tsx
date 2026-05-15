@@ -41,7 +41,7 @@ export function PublicProfileClient({ slug }: { slug: string }) {
         <Brand />
         <div className="mt-8 rounded-[2rem] bg-white p-8 text-center shadow-soft">
           <h1 className="text-3xl font-black">Wishlist not found</h1>
-          <p className="mt-2 font-semibold text-ink/60">This public profile may have moved.</p>
+          <p className="mt-2 font-semibold text-ink/60">This public wishlist may have moved.</p>
         </div>
       </main>
     );

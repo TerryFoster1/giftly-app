@@ -16,7 +16,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
               Dashboard
             </Link>
             <Link className="rounded-full px-4 py-2 text-sm font-bold hover:bg-white" href="/profiles">
-              Profiles
+              People
             </Link>
             {user ? (
               <Link className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold hover:bg-white" href="/logout" prefetch={false}>
@@ -44,7 +44,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
           <Link className="grid place-items-center gap-1 rounded-2xl p-2 text-xs font-bold" href="/profiles">
             <UserRound size={20} />
-            Profiles
+            People
           </Link>
         </div>
       </nav>

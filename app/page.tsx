@@ -4,8 +4,8 @@ import { AppShell } from "@/components/shell";
 
 const features = [
   ["Save all year", "Paste or enter ideas when they pop up, then sort them by occasion and want level."],
-  ["Share by QR", "Every profile gets a public wishlist link and QR card for friends and family."],
-  ["Plan for family", "Manage profiles for kids, partners, parents, or anyone you buy for."],
+  ["Share by QR", "Every gift account gets a public wishlist link and QR card for friends and family."],
+  ["Build your circle", "Add the people you buy for most, then invite or transfer ownership later."],
   ["Keep surprises", "Private and hidden ideas stay out of the public wishlist view."]
 ];
 
@@ -32,7 +32,7 @@ export default function LandingPage() {
               </Link>
               <Link className="focus-ring inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-white px-5 text-sm font-black text-ink shadow-sm ring-1 ring-ink/10 hover:bg-blush" href="/profiles">
                 <UsersRound size={18} />
-                Create Family Profile
+                Build Your Gift Circle
               </Link>
             </div>
           </div>

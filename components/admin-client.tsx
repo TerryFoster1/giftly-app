@@ -315,7 +315,7 @@ export function AdminClient() {
       return;
     }
     const confirmed = window.confirm(
-      `Delete ${adminUser.name}? This deletes the user account, sessions, profiles, wishlists, gift items, reservations, and contribution records. Password hashes are not shown and will be removed with the account.`
+      `Delete ${adminUser.name}? This deletes the user account, sessions, gift accounts, wishlists, gift items, reservations, and contribution records. Password hashes are not shown and will be removed with the account.`
     );
     if (!confirmed) return;
     setError("");
@@ -332,7 +332,7 @@ export function AdminClient() {
   const cards: Array<{ id: AdminSection; label: string; value: string | number; detail: string; icon: React.ReactNode }> = [
     { id: "users", label: "Users", value: metrics?.totalUsers ?? "-", detail: "Search, filter, inspect, delete", icon: <UsersRound size={20} /> },
     { id: "gifts", label: "Gifts", value: metrics?.totalGifts ?? "-", detail: "Saved product ideas", icon: <PackagePlus size={20} /> },
-    { id: "wishlists", label: "Wishlists", value: metrics?.totalProfiles ?? "-", detail: "Profiles and list visibility", icon: <ShieldCheck size={20} /> },
+    { id: "wishlists", label: "Wishlists", value: metrics?.totalProfiles ?? "-", detail: "Gift accounts and list visibility", icon: <ShieldCheck size={20} /> },
     { id: "recommended", label: "Recommended Products", value: metrics?.recommendedProducts ?? "-", detail: "Curated gift discovery", icon: <ExternalLink size={20} /> },
     { id: "affiliate", label: "Affiliate Setup", value: metrics?.affiliatePrograms ?? "-", detail: "Amazon tracking tags only", icon: <Link2 size={20} /> },
     { id: "unmatched", label: "Unmatched Products", value: metrics?.productsMissingAffiliateLinks ?? "-", detail: "Needs affiliate review", icon: <Search size={20} /> },
@@ -444,7 +444,7 @@ export function AdminClient() {
                       <p className="rounded-2xl bg-cloud p-3">{selectedUser.giftCount} gifts</p>
                     </div>
                     <p className="rounded-2xl bg-blush p-3 text-xs font-bold leading-5 text-berry">
-                      Deleting removes the account, sessions, profiles, gifts, reservations, and contribution placeholders. Passwords and secrets are never shown here.
+                      Deleting removes the account, sessions, gift accounts, gifts, reservations, and contribution placeholders. Passwords and secrets are never shown here.
                     </p>
                     <Button type="button" variant="danger" disabled={overview?.currentUserId === selectedUser.id} onClick={() => deleteUser(selectedUser.id)}>
                       <Trash2 size={14} />

@@ -33,11 +33,11 @@ function redirectWithSessionCookie(url: URL, cookie: string) {
 export async function POST(request: Request) {
   try {
     const body = await readAuthBody(request);
-    const { session } = await signInWithPassword(body);
+    const { user, session } = await signInWithPassword(body);
     const cookie = serializeSessionCookie(session);
     const response = wantsJson(request)
       ? NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store", "Set-Cookie": cookie } })
-      : redirectWithSessionCookie(new URL("/dashboard", request.url), cookie);
+      : redirectWithSessionCookie(new URL(user.onboardingCompleted ? "/dashboard" : "/onboarding", request.url), cookie);
     console.info("[auth-debug] Setting session cookie", {
       route: "login",
       runtime: process.env.NEXT_RUNTIME ?? "nodejs",
