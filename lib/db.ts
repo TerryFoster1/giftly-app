@@ -855,6 +855,75 @@ export async function deleteAffiliateProgram(user: User, id: string) {
   return { ok: true };
 }
 
+export async function backfillAmazonAffiliateUrls(user: User) {
+  if (!userHasAdminAccess(user)) throw new Error("FORBIDDEN");
+
+  const trackingTag = await getActiveAmazonTrackingTag();
+  if (!trackingTag) throw new Error("AFFILIATE_TAG_REQUIRED");
+
+  const [gifts, recommendedProducts] = await Promise.all([
+    prisma.giftItem.findMany({
+      where: {
+        affiliateUrl: null
+      }
+    }),
+    prisma.recommendedProduct.findMany({
+      where: {
+        affiliateUrl: null
+      }
+    })
+  ]);
+
+  let giftsUpdated = 0;
+  let recommendedUpdated = 0;
+
+  for (const gift of gifts) {
+    const sourceUrl = gift.originalUrl || gift.productUrl;
+    if (!isAmazonUrl(sourceUrl)) continue;
+    const normalizedUrl = normalizeAmazonProductUrl(sourceUrl).url || sourceUrl;
+    const affiliateUrl = amazonAffiliateUrl(normalizedUrl, trackingTag);
+    if (!affiliateUrl) continue;
+
+    await prisma.giftItem.update({
+      where: { id: gift.id },
+      data: {
+        productUrl: normalizedUrl,
+        originalUrl: normalizedUrl,
+        affiliateUrl,
+        monetizedUrl: affiliateUrl,
+        affiliateStatus: "converted"
+      }
+    });
+    giftsUpdated += 1;
+  }
+
+  for (const product of recommendedProducts) {
+    const sourceUrl = product.originalUrl;
+    if (!isAmazonUrl(sourceUrl)) continue;
+    const normalizedUrl = normalizeAmazonProductUrl(sourceUrl).url || sourceUrl;
+    const affiliateUrl = amazonAffiliateUrl(normalizedUrl, trackingTag);
+    if (!affiliateUrl) continue;
+
+    await prisma.recommendedProduct.update({
+      where: { id: product.id },
+      data: {
+        originalUrl: normalizedUrl,
+        affiliateUrl,
+        affiliateProgram: product.affiliateProgram || "Amazon Associates",
+        affiliateStatus: "matched"
+      }
+    });
+    recommendedUpdated += 1;
+  }
+
+  return {
+    ok: true,
+    giftsUpdated,
+    recommendedUpdated,
+    totalUpdated: giftsUpdated + recommendedUpdated
+  };
+}
+
 export async function deleteAdminUser(admin: User, userId: string) {
   if (!userHasAdminAccess(admin)) throw new Error("FORBIDDEN");
   if (admin.id === userId) throw new Error("CANNOT_DELETE_SELF");

@@ -40,7 +40,10 @@ These are intentionally future-facing notes. They are not part of the current MV
 ## Affiliate Expansion
 
 - Current MVP stores Amazon Associates tracking tags only and appends the `tag` query parameter for Amazon product URLs.
+- Admins can scan existing Amazon gifts and recommended products to generate missing affiliate URLs after a tracking tag is configured.
 - Future support may include Amazon PA API, affiliate APIs, automated enrichment, AI affiliate matching, pricing sync, and multi-network support.
+- Future click tracking should route outbound affiliate clicks through a first-party redirect that records gift/product id, source surface, and anonymous visitor/session context.
+- Future conversion tracking should integrate network reporting or postback APIs without storing affiliate account passwords.
 - Do not store affiliate account passwords or dashboard login credentials.
 
 ## Vendor QR and Save-Later

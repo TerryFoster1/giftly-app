@@ -30,7 +30,7 @@ export function GiftCard({
   const priceLabel = gift.currency ? `${gift.currency} $${gift.price.toFixed(2)}` : gift.price ? gift.price.toFixed(2) : "Price not saved";
   const metaLabel = [gift.storeName, priceLabel].filter(Boolean).join(" / ");
   const detailPath = `/gifts/${gift.id}`;
-  const buyUrl = gift.affiliateUrl || gift.monetizedUrl || gift.productUrl;
+  const buyUrl = gift.affiliateUrl || gift.monetizedUrl || gift.originalUrl || gift.productUrl;
   const unavailableToViewer = publicMode && (gift.purchasedStatus || gift.reservedStatus === "reserved");
   const image = (
     <div className="aspect-[6/4] bg-cloud">

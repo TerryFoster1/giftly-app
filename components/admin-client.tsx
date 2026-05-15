@@ -290,6 +290,23 @@ export function AdminClient() {
     }
   }
 
+  async function backfillAmazonLinks() {
+    setSaving(true);
+    setMessage("");
+    setError("");
+    try {
+      const result = await requestJson<{ totalUpdated: number; giftsUpdated: number; recommendedUpdated: number }>("/api/admin/affiliate-programs/backfill", {
+        method: "POST"
+      });
+      await refresh();
+      setMessage(`Affiliate scan complete: ${result.totalUpdated} Amazon ${result.totalUpdated === 1 ? "item" : "items"} updated (${result.giftsUpdated} gifts, ${result.recommendedUpdated} recommended products).`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Affiliate scan could not be completed.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function deleteUser(userId: string) {
     const adminUser = (overview?.users ?? []).find((user) => user.id === userId);
     if (!adminUser) return;
@@ -596,6 +613,9 @@ export function AdminClient() {
                   <Button type="submit" disabled={saving}>{saving ? "Saving..." : "Save affiliate setup"}</Button>
                   <Button type="button" variant="ghost" onClick={() => setAffiliateForm(blankAffiliate)}>Clear form</Button>
                 </div>
+                <Button type="button" variant="secondary" onClick={backfillAmazonLinks} disabled={saving}>
+                  Scan existing Amazon products
+                </Button>
               </form>
 
               <div className="grid content-start gap-3">
