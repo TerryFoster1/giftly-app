@@ -1,13 +1,25 @@
 "use client";
 
 import { BarChart3, Edit3, ExternalLink, Link2, PackagePlus, Search, ShieldCheck, Trash2, UsersRound, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { normalizeProductUrl } from "@/lib/product-url";
 import type { AdminOverview, AffiliateProgram, RecommendedAffiliateStatus, RecommendedProduct } from "@/lib/types";
 import { Button, Field, Input, Select, Textarea } from "./ui";
 
 type AdminSection = "users" | "gifts" | "wishlists" | "recommended" | "affiliate" | "unmatched" | "analytics";
 type UserFilter = "all" | "admins" | "has_gifts" | "no_gifts";
 type ProductFilter = "all" | "active" | "inactive" | "affiliate_missing" | "affiliate_ready";
+type MetadataResult = {
+  title?: string;
+  description?: string;
+  imageUrl?: string;
+  storeName?: string;
+  siteName?: string;
+  price?: string | number;
+  currency?: string;
+  canonicalUrl?: string;
+  error?: string;
+};
 
 const blankProduct: RecommendedProduct = {
   id: "",
@@ -79,9 +91,12 @@ export function AdminClient() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [fetchingProductMetadata, setFetchingProductMetadata] = useState(false);
+  const [productMetadataMessage, setProductMetadataMessage] = useState("");
   const [query, setQuery] = useState("");
   const [userFilter, setUserFilter] = useState<UserFilter>("all");
   const [productFilter, setProductFilter] = useState<ProductFilter>("all");
+  const lastFetchedProductUrl = useRef("");
 
   async function refresh() {
     setError("");
@@ -95,6 +110,48 @@ export function AdminClient() {
   useEffect(() => {
     refresh();
   }, []);
+
+  useEffect(() => {
+    if (activeSection !== "recommended" || productForm.id) return;
+    const rawUrl = productForm.originalUrl.trim();
+    if (!rawUrl) {
+      setProductMetadataMessage("");
+      return;
+    }
+
+    const normalized = normalizeProductUrl(rawUrl);
+    if (normalized.error || !normalized.url) return;
+    if (normalized.url === lastFetchedProductUrl.current) return;
+
+    const timer = window.setTimeout(async () => {
+      setFetchingProductMetadata(true);
+      setProductMetadataMessage("Fetching product details...");
+      lastFetchedProductUrl.current = normalized.url;
+      try {
+        const metadata = await requestJson<MetadataResult>("/api/metadata", {
+          method: "POST",
+          body: JSON.stringify({ url: normalized.url })
+        });
+        setProductForm((current) => ({
+          ...current,
+          title: metadata.title || current.title,
+          description: metadata.description || current.description,
+          imageUrl: metadata.imageUrl || current.imageUrl,
+          originalUrl: normalized.url,
+          storeName: metadata.storeName || metadata.siteName || current.storeName,
+          price: metadata.price ? Number(metadata.price) : current.price,
+          currency: metadata.currency ? metadata.currency.trim().toUpperCase() : current.currency
+        }));
+        setProductMetadataMessage(metadata.error || "Product details filled in. You can edit anything before saving.");
+      } catch {
+        setProductMetadataMessage("We couldn't pull details from this site. You can still add it manually.");
+      } finally {
+        setFetchingProductMetadata(false);
+      }
+    }, 700);
+
+    return () => window.clearTimeout(timer);
+  }, [activeSection, productForm.id, productForm.originalUrl]);
 
   const search = query.trim().toLowerCase();
   const metrics = overview?.metrics;
@@ -151,6 +208,8 @@ export function AdminClient() {
 
   function editProduct(product: RecommendedProduct) {
     setProductForm(product);
+    lastFetchedProductUrl.current = product.originalUrl;
+    setProductMetadataMessage("");
     setActiveSection("recommended");
     setMessage("Editing recommended product.");
   }
@@ -417,6 +476,8 @@ export function AdminClient() {
                 <Field label="Product URL">
                   <Input value={productForm.originalUrl} onChange={(event) => updateProduct("originalUrl", event.target.value)} placeholder="https://..." />
                 </Field>
+                {fetchingProductMetadata ? <p className="text-sm font-bold text-ink/55">Fetching product details...</p> : null}
+                {productMetadataMessage ? <p className="text-sm font-bold text-ink/60">{productMetadataMessage}</p> : null}
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Field label="Title">
                     <Input required value={productForm.title} onChange={(event) => updateProduct("title", event.target.value)} />
