@@ -1,11 +1,12 @@
 import { withUser } from "@/lib/api";
+import { userHasAdminAccess } from "@/lib/auth";
 import { listActiveRecommendedProducts, upsertRecommendedProduct } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   return withUser(async (user) => {
-    if (!user.isAdmin) throw new Error("FORBIDDEN");
+    if (!userHasAdminAccess(user)) throw new Error("FORBIDDEN");
     return listActiveRecommendedProducts();
   }, { logLabel: "admin-recommended-products", request });
 }

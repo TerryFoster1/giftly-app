@@ -1,5 +1,6 @@
 import { EventTag as DbEventTag, GroupLabel as DbGroupLabel, Prisma } from "@prisma/client";
 import { randomUUID } from "crypto";
+import { userHasAdminAccess } from "./auth";
 import { prisma } from "./prisma";
 import type { AdminOverview, Connection, EventTag, GiftItem, GroupLabel, Profile, RecommendedProduct, Reservation, User } from "./types";
 
@@ -592,7 +593,7 @@ export async function listActiveRecommendedProducts() {
 }
 
 export async function upsertRecommendedProduct(user: User, input: Partial<RecommendedProduct>) {
-  if (!user.isAdmin) throw new Error("FORBIDDEN");
+  if (!userHasAdminAccess(user)) throw new Error("FORBIDDEN");
   const data = normalizeRecommendedProductInput(input, user.id);
   const { id, createdAt: _createdAt, createdByUserId: _createdByUserId, ...updateData } = data;
   const saved = await prisma.recommendedProduct.upsert({
@@ -604,13 +605,13 @@ export async function upsertRecommendedProduct(user: User, input: Partial<Recomm
 }
 
 export async function deleteRecommendedProduct(user: User, id: string) {
-  if (!user.isAdmin) throw new Error("FORBIDDEN");
+  if (!userHasAdminAccess(user)) throw new Error("FORBIDDEN");
   await prisma.recommendedProduct.delete({ where: { id } });
   return { ok: true };
 }
 
 export async function getAdminOverview(user: User): Promise<AdminOverview> {
-  if (!user.isAdmin) throw new Error("FORBIDDEN");
+  if (!userHasAdminAccess(user)) throw new Error("FORBIDDEN");
 
   const [
     totalUsers,

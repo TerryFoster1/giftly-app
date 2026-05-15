@@ -19,29 +19,9 @@ const foundationGiftGroups = [
     tone: "bg-mint text-spruce"
   },
   {
-    title: "Brian & Becky's Wedding",
-    description: "Coordinate registry ideas, shared events, and thoughtful gifts around a couple.",
-    tone: "bg-blush text-berry"
-  },
-  {
-    title: "Household",
-    description: "Keep practical shared gift ideas for the people under one roof.",
-    tone: "bg-honey/50 text-ink"
-  },
-  {
     title: "Friends",
     description: "Save birthday ideas, group plans, and gift inspiration for close friends.",
     tone: "bg-cloud text-ink"
-  },
-  {
-    title: "Kids",
-    description: "Manage wishlists now, then invite or transfer ownership when they are ready.",
-    tone: "bg-blush text-berry"
-  },
-  {
-    title: "Couples",
-    description: "Plan partner-specific gift ideas with room for surprise-safe buying later.",
-    tone: "bg-mint text-spruce"
   }
 ];
 
@@ -102,21 +82,13 @@ export function DashboardClient() {
     [connections]
   );
   const giftGroups = useMemo(() => {
-    const customGroups = existingGroupNames
-      .filter((label) => !foundationGiftGroups.some((group) => group.title === label))
-      .map((label) => ({
-        title: label,
-        description: "A shared space for wishlists, events, and gift planning.",
-        tone: "bg-cloud text-ink"
-      }));
-
-    return [...foundationGiftGroups, ...customGroups].map((group) => ({
+    return foundationGiftGroups.map((group) => ({
       ...group,
       count:
         connections.filter((connection) => (connection.customGroupLabel || titleCaseGroup(connection.groupLabel)) === group.title).length ||
         (group.title === "Family" ? profiles.length : 0)
     }));
-  }, [connections, existingGroupNames, profiles.length]);
+  }, [connections, profiles.length]);
 
   useEffect(() => {
     fetch("/api/recommended-products", { cache: "no-store" })
@@ -385,6 +357,20 @@ export function DashboardClient() {
               </Button>
             </article>
           ))}
+          <button
+            type="button"
+            className="focus-ring grid gap-3 rounded-[1.5rem] border border-dashed border-ink/20 bg-white p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft"
+            onClick={() => setShareOpen(true)}
+          >
+            <div className="grid aspect-[4/3] place-items-center rounded-2xl bg-cloud text-berry">
+              <Plus size={28} />
+            </div>
+            <div>
+              <h3 className="text-lg font-black">Add New Group</h3>
+              <p className="mt-1 text-sm font-semibold leading-6 text-ink/60">Create your own group for shared wishlists and events.</p>
+            </div>
+            <span className="rounded-full bg-blush px-3 py-1 text-xs font-black text-berry">Create group</span>
+          </button>
         </div>
       </section>
 

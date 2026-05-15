@@ -17,15 +17,22 @@ function hashToken(token: string) {
 }
 
 function normalizeEmail(email: string) {
-  return email.trim().toLowerCase();
+  return email.trim().replace(/^["']|["']$/g, "").toLowerCase();
 }
 
 function isConfiguredAdminEmail(email: string) {
-  return (process.env.ADMIN_EMAILS || "")
-    .split(",")
+  return [process.env.ADMIN_EMAILS, process.env.ADMIN_EMAIL, process.env.GIFTLY_ADMIN_EMAILS]
+    .filter(Boolean)
+    .join(",")
+    .split(/[\s,;]+/)
     .map((value) => normalizeEmail(value))
     .filter(Boolean)
     .includes(normalizeEmail(email));
+}
+
+export function userHasAdminAccess(user: { email: string; isAdmin?: boolean | null } | null | undefined) {
+  if (!user) return false;
+  return Boolean(user.isAdmin || isConfiguredAdminEmail(user.email));
 }
 
 function parseCookieHeader(header: string | null) {
