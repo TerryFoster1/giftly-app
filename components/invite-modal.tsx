@@ -1,12 +1,12 @@
 "use client";
 
 import { Copy, Mail, QrCode, UsersRound, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { GroupLabel } from "@/lib/types";
 import { Button, Field, Input, Select } from "./ui";
 import { QrCard } from "./qr-card";
 
-const standardGroups = ["Family", "Wedding", "Household", "Friends", "Kids", "Couples", "Custom"];
+const standardGroups = ["Family", "Friends"];
 
 function connectionGroupFor(label: string): { groupLabel: GroupLabel; customGroupLabel?: string } {
   if (label === "Family") return { groupLabel: "FAMILY" };
@@ -19,11 +19,12 @@ type InviteModalProps = {
   title?: string;
   profileUrl: string;
   existingGroups: string[];
+  initialMode?: "existing" | "new";
   onClose: () => void;
   onInvite: (input: { emailOrPhone?: string; groupLabel: GroupLabel; customGroupLabel?: string }) => Promise<void>;
 };
 
-export function InviteModal({ open, title = "Invite Friends & Family", profileUrl, existingGroups, onClose, onInvite }: InviteModalProps) {
+export function InviteModal({ open, title = "Invite Friends & Family", profileUrl, existingGroups, initialMode = "existing", onClose, onInvite }: InviteModalProps) {
   const [emailOrPhone, setEmailOrPhone] = useState("");
   const [mode, setMode] = useState<"existing" | "new">("existing");
   const [selectedGroup, setSelectedGroup] = useState("Family");
@@ -35,6 +36,10 @@ export function InviteModal({ open, title = "Invite Friends & Family", profileUr
     const names = Array.from(new Set([...standardGroups, ...existingGroups].filter(Boolean)));
     return names;
   }, [existingGroups]);
+
+  useEffect(() => {
+    if (open) setMode(initialMode);
+  }, [initialMode, open]);
 
   if (!open) return null;
 
@@ -130,7 +135,7 @@ export function InviteModal({ open, title = "Invite Friends & Family", profileUr
               </Field>
             ) : (
               <Field label="New group">
-                <Input value={newGroup} onChange={(event) => setNewGroup(event.target.value)} placeholder="Household, wedding, kids, couples..." />
+                <Input value={newGroup} onChange={(event) => setNewGroup(event.target.value)} placeholder="Book club, neighbors, holiday crew..." />
               </Field>
             )}
             <p className="rounded-2xl bg-blush p-3 text-xs font-bold leading-5 text-berry">

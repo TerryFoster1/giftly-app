@@ -62,6 +62,11 @@ function titleCaseGroup(value: string) {
     .join(" ");
 }
 
+function isDemoGroupName(value: string) {
+  const normalized = value.trim().toLowerCase();
+  return ["wedding", "household", "kids", "couples", "brian and becky's wedding", "brian & becky's wedding"].includes(normalized);
+}
+
 export function DashboardClient() {
   const { user, profiles, gifts, connections = [], ready, actionError, actions } = useGiftlyStore();
   const [giftMessage, setGiftMessage] = useState("");
@@ -78,12 +83,20 @@ export function DashboardClient() {
   const [standaloneListVisibility, setStandaloneListVisibility] = useState<"private" | "shared">("shared");
   const [createListSaving, setCreateListSaving] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [shareInitialMode, setShareInitialMode] = useState<"existing" | "new">("existing");
   const [recommendedProducts, setRecommendedProducts] = useState<RecommendedProduct[]>([]);
 
   const primaryProfile = profiles.find((profile) => profile.isPrimary) ?? profiles[0];
   const upcomingEvents = useMemo(() => getUpcomingProfileEvents(profiles).slice(0, 3), [profiles]);
   const existingGroupNames = useMemo(
-    () => Array.from(new Set(connections.map((connection) => connection.customGroupLabel || titleCaseGroup(connection.groupLabel)).filter(Boolean))),
+    () =>
+      Array.from(
+        new Set(
+          connections
+            .map((connection) => connection.customGroupLabel || titleCaseGroup(connection.groupLabel))
+            .filter((group): group is string => Boolean(group) && !isDemoGroupName(group))
+        )
+      ),
     [connections]
   );
   const giftGroups = useMemo(() => {
@@ -213,6 +226,11 @@ export function DashboardClient() {
     await actions.refresh();
   }
 
+  function openShareModal(mode: "existing" | "new" = "existing") {
+    setShareInitialMode(mode);
+    setShareOpen(true);
+  }
+
   async function createStandaloneWishlist() {
     setFastError("");
     if (!standaloneListName.trim()) {
@@ -283,11 +301,11 @@ export function DashboardClient() {
         </div>
         {fastError ? <p className="rounded-2xl bg-blush p-3 text-sm font-bold text-berry">{fastError}</p> : null}
         <div className="flex flex-col gap-2 sm:flex-row">
-          <Button type="button" variant="secondary" onClick={() => setShareOpen(true)}>
+          <Button type="button" variant="secondary" onClick={() => openShareModal("existing")}>
             <Share2 size={16} />
             Share your Giftly profile
           </Button>
-          <Button type="button" variant="ghost" onClick={() => setShareOpen(true)}>
+          <Button type="button" variant="ghost" onClick={() => openShareModal("existing")}>
             <UsersRound size={16} />
             Invite family members
           </Button>
@@ -410,7 +428,7 @@ export function DashboardClient() {
               <p className="rounded-full bg-cloud px-3 py-1 text-xs font-black text-ink/60">
                 {group.count ? `${group.count} connected ${group.count === 1 ? "person" : "people"}` : "Shared event ready"}
               </p>
-              <Button type="button" variant="ghost" onClick={() => setShareOpen(true)}>
+              <Button type="button" variant="ghost" onClick={() => openShareModal("existing")}>
                 <Share2 size={16} />
                 Invite
               </Button>
@@ -419,13 +437,13 @@ export function DashboardClient() {
           <button
             type="button"
             className="focus-ring grid gap-3 rounded-[1.5rem] border border-dashed border-ink/20 bg-white p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft"
-            onClick={() => setShareOpen(true)}
+            onClick={() => openShareModal("new")}
           >
             <div className="grid aspect-[4/3] place-items-center rounded-2xl bg-cloud text-berry">
               <Plus size={28} />
             </div>
             <div>
-              <h3 className="text-lg font-black">Add New Group</h3>
+              <h3 className="text-lg font-black">Add Group</h3>
               <p className="mt-1 text-sm font-semibold leading-6 text-ink/60">Create your own group for shared wishlists and events.</p>
             </div>
             <span className="rounded-full bg-blush px-3 py-1 text-xs font-black text-berry">Create group</span>
@@ -567,6 +585,7 @@ export function DashboardClient() {
         title="Share your Giftly profile"
         profileUrl={primaryProfile ? publicProfileUrl(primaryProfile.slug) : ""}
         existingGroups={existingGroupNames}
+        initialMode={shareInitialMode}
         onClose={() => setShareOpen(false)}
         onInvite={saveInvite}
       />
