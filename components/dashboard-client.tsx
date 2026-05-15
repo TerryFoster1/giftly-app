@@ -264,6 +264,150 @@ export function DashboardClient({ initialSlug }: { initialSlug?: string }) {
     );
   }
 
+  if (isListDetail) {
+    return (
+      <main className="mx-auto grid max-w-6xl gap-5 px-4 py-6">
+        <section className="grid gap-4 rounded-[2rem] border border-ink/10 bg-white p-5 shadow-soft">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <Link className="text-sm font-black text-spruce underline" href="/dashboard">
+                Back to dashboard
+              </Link>
+              <p className="mt-4 text-sm font-black uppercase text-berry">Wishlist</p>
+              <h1 className="text-3xl font-black leading-tight sm:text-5xl">{selectedProfile.displayName}</h1>
+              <p className="mt-2 max-w-xl text-sm font-semibold leading-6 text-ink/60">
+                Browse saved gift ideas, compare priorities, and keep this list ready to share when someone asks.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 sm:items-end">
+              <Link className="text-sm font-black text-spruce underline" href={publicProfilePath(selectedProfile.slug)}>
+                View public profile
+              </Link>
+              <Button type="button" onClick={() => { setEditing(null); setShowForm(true); }}>
+                <Plus size={16} />
+                Add gift
+              </Button>
+            </div>
+          </div>
+          <div className="grid gap-3 rounded-3xl bg-cloud p-3 sm:grid-cols-[1fr_auto]">
+            <Input
+              aria-label="Product link"
+              placeholder="Paste a product link"
+              type="text"
+              value={fastUrl}
+              onChange={(event) => setFastUrl(event.target.value)}
+            />
+            <Button type="button" onClick={openFastAdd}>
+              <Plus size={16} />
+              Quick add
+            </Button>
+          </div>
+          {fastError ? <p className="rounded-2xl bg-blush p-3 text-sm font-bold text-berry">{fastError}</p> : null}
+        </section>
+
+        {giftMessage ? <p className="rounded-2xl bg-mint p-3 text-sm font-bold text-spruce">{giftMessage}</p> : null}
+        {actionError ? <p className="rounded-2xl bg-blush p-3 text-sm font-bold text-berry">{actionError}</p> : null}
+
+        <section className="grid gap-4">
+          <div className="grid gap-3 rounded-[1.5rem] border border-ink/10 bg-white p-3 shadow-sm sm:grid-cols-3">
+            <Select value={eventFilter} onChange={(event) => setEventFilter(event.target.value)}>
+              <option>All events</option>
+              {eventTags.map((tag) => <option key={tag}>{tag}</option>)}
+            </Select>
+            <Select value={visibilityFilter} onChange={(event) => setVisibilityFilter(event.target.value as Visibility | "All")}>
+              <option>All visibility</option>
+              <option value="private">Private</option>
+              <option value="shared">Shared</option>
+              <option value="public">Public</option>
+            </Select>
+            <Select value={sort} onChange={(event) => setSort(event.target.value)}>
+              <option value="newest">Newest</option>
+              <option value="want">Want rating</option>
+              <option value="price">Price</option>
+            </Select>
+          </div>
+
+          {showForm || editing ? (
+            <GiftForm
+              profileId={selectedProfile.id}
+              gift={editing ?? undefined}
+              onSave={saveGift}
+              onCancel={() => { setEditing(null); setShowForm(false); }}
+            />
+          ) : null}
+
+          {visibleGifts.length ? (
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {visibleGifts.map((gift) => (
+                <GiftCard
+                  key={gift.id}
+                  gift={gift}
+                  onEdit={setEditing}
+                  onDelete={actions.deleteGift}
+                  onToggleReserved={toggleReserved}
+                  onTogglePurchased={togglePurchased}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-[2rem] border border-dashed border-ink/20 bg-white p-8 text-center">
+              <h3 className="text-xl font-black">No gifts match this view.</h3>
+              <p className="mt-2 font-semibold text-ink/60">Add an idea or loosen the filters.</p>
+            </div>
+          )}
+        </section>
+
+        {fastModalOpen ? (
+          <div className="fixed inset-0 z-40 grid place-items-end bg-ink/40 p-0 sm:place-items-center sm:p-4">
+            <div className="max-h-[92vh] w-full max-w-lg overflow-auto rounded-t-[2rem] bg-white p-4 shadow-soft sm:rounded-[2rem]">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-xl font-black">Add to wishlist</h2>
+                <Button type="button" variant="ghost" onClick={() => setFastModalOpen(false)} aria-label="Close">
+                  <X size={16} />
+                </Button>
+              </div>
+              <div className="mt-4 grid gap-3">
+                <label className="flex items-center gap-3 text-sm font-black">
+                  <input type="radio" checked={!createNewList} onChange={() => setCreateNewList(false)} />
+                  Select existing wishlist
+                </label>
+                {!createNewList ? (
+                  <Select value={fastProfileId} onChange={(event) => setFastProfileId(event.target.value)}>
+                    {profiles.map((profile) => (
+                      <option value={profile.id} key={profile.id}>{profile.displayName}</option>
+                    ))}
+                  </Select>
+                ) : null}
+                <label className="flex items-center gap-3 text-sm font-black">
+                  <input type="radio" checked={createNewList} onChange={() => setCreateNewList(true)} />
+                  Create new wishlist
+                </label>
+                {createNewList ? (
+                  <Field label="New wishlist name">
+                    <Input value={newListName} onChange={(event) => setNewListName(event.target.value)} />
+                  </Field>
+                ) : null}
+                <Field label="List privacy">
+                  <Select value={fastVisibility} onChange={(event) => setFastVisibility(event.target.value as "private" | "shared")}>
+                    <option value="private">Private</option>
+                    <option value="shared">Shared</option>
+                  </Select>
+                </Field>
+                <p className="rounded-2xl bg-cloud p-3 text-xs font-bold leading-5 text-ink/60">
+                  Future: shared lists can be limited to groups like Family or Close Friends, with product-level exclusions.
+                </p>
+                {fastError ? <p className="rounded-2xl bg-blush p-3 text-sm font-bold text-berry">{fastError}</p> : null}
+                <Button type="button" onClick={saveFastGift} disabled={fastSaving}>
+                  {fastSaving ? "Saving..." : "Save gift"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </main>
+    );
+  }
+
   return (
     <main className="mx-auto grid max-w-6xl gap-6 px-4 py-6">
       <section className="grid gap-5 rounded-[2rem] border border-ink/10 bg-white p-5 shadow-soft">
@@ -407,71 +551,6 @@ export function DashboardClient({ initialSlug }: { initialSlug?: string }) {
           ))}
         </div>
       </section>
-
-      {isListDetail ? (
-      <section className="grid gap-5">
-        <div className="rounded-[2rem] border border-ink/10 bg-white p-4 shadow-soft">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-sm font-black uppercase text-berry">Selected wishlist</p>
-              <h2 className="text-3xl font-black">{selectedProfile.displayName}</h2>
-              <Link className="mt-1 inline-block text-sm font-black text-spruce underline" href={publicProfilePath(selectedProfile.slug)}>
-                View public profile
-              </Link>
-            </div>
-            <Select value={selectedProfile.id} onChange={(event) => setSelectedProfileId(event.target.value)}>
-              {profiles.map((profile) => (
-                <option value={profile.id} key={profile.id}>{profile.displayName}</option>
-              ))}
-            </Select>
-          </div>
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
-            <Select value={eventFilter} onChange={(event) => setEventFilter(event.target.value)}>
-              <option>All</option>
-              {eventTags.map((tag) => <option key={tag}>{tag}</option>)}
-            </Select>
-            <Select value={visibilityFilter} onChange={(event) => setVisibilityFilter(event.target.value as Visibility | "All")}>
-              <option>All</option>
-              <option value="private">Private</option>
-              <option value="shared">Shared</option>
-              <option value="public">Public</option>
-            </Select>
-            <Select value={sort} onChange={(event) => setSort(event.target.value)}>
-              <option value="newest">Newest</option>
-              <option value="want">Want rating</option>
-              <option value="price">Price</option>
-            </Select>
-          </div>
-        </div>
-        {showForm || editing ? (
-          <GiftForm
-            profileId={selectedProfile.id}
-            gift={editing ?? undefined}
-            onSave={saveGift}
-            onCancel={() => { setEditing(null); setShowForm(false); }}
-          />
-        ) : null}
-        {visibleGifts.length ? (
-          <div className="grid gap-4 md:grid-cols-2">
-            {visibleGifts.map((gift) => (
-              <GiftCard
-                key={gift.id}
-                gift={gift}
-                onEdit={setEditing}
-                onDelete={actions.deleteGift}
-                onToggleReserved={toggleReserved}
-                onTogglePurchased={togglePurchased}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-[2rem] border border-dashed border-ink/20 bg-white p-8 text-center">
-            <h3 className="text-xl font-black">No gifts match this view.</h3>
-            <p className="mt-2 font-semibold text-ink/60">Add an idea or loosen the filters.</p>
-          </div>
-        )}
-      </section>
-      ) : null}
 
       {fastModalOpen ? (
         <div className="fixed inset-0 z-40 grid place-items-end bg-ink/40 p-0 sm:place-items-center sm:p-4">
