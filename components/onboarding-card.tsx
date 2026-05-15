@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { CheckCircle2, Gift, Plus, UsersRound, X } from "lucide-react";
+import { Plus, UsersRound, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "./ui";
 
@@ -20,7 +20,7 @@ export function OnboardingCard({ userName, onboardingCompleted, wishlistCount, o
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    setVisible(!onboardingCompleted);
+    setVisible(!onboardingCompleted && window.localStorage.getItem(storageKey) !== "true");
   }, [onboardingCompleted]);
 
   function skip() {
@@ -32,13 +32,13 @@ export function OnboardingCard({ userName, onboardingCompleted, wishlistCount, o
   if (!visible) return null;
 
   return (
-    <section className="grid gap-4 rounded-[2rem] border border-ink/10 bg-white p-4 shadow-soft">
+    <section className="rounded-[1.5rem] border border-ink/10 bg-white p-3 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-black uppercase text-berry">Giftly walkthrough</p>
-          <h2 className="mt-1 text-2xl font-black">Build your gifting circle.</h2>
-          <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-ink/60">
-            Add the people you buy for, create a few wishlists, invite family or friends when it is useful, then save your first gift link.
+          <p className="text-xs font-black uppercase text-berry">Quick start</p>
+          <h2 className="mt-1 text-lg font-black">Build your gifting circle.</h2>
+          <p className="mt-1 max-w-2xl text-sm font-semibold leading-5 text-ink/60">
+            Add people to your Bubble, create/share a wishlist, then save a gift link when inspiration hits.
           </p>
         </div>
         <Button type="button" variant="ghost" aria-label="Skip onboarding" onClick={skip}>
@@ -46,44 +46,23 @@ export function OnboardingCard({ userName, onboardingCompleted, wishlistCount, o
         </Button>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {[
-          ["Add people", `${userName || "You"} plus family and friends`, <UsersRound size={18} />],
-          ["Create wishlists", wishlistCount >= 3 ? "My Birthday and Cool Stuff are ready" : "Create a few useful lists", <Gift size={18} />],
-          ["Add events", "Birthdays, anniversaries, weddings, and holidays give Giftly timing", <CheckCircle2 size={18} />],
-          ["Save first gift", "Paste a product link when an idea pops up", <Plus size={18} />]
-        ].map(([title, copy, icon]) => (
-          <div className="rounded-3xl bg-cloud p-3" key={String(title)}>
-            <div className="mb-3 grid h-9 w-9 place-items-center rounded-2xl bg-white text-berry">{icon}</div>
-            <h3 className="font-black">{title}</h3>
-            <p className="mt-1 text-sm font-semibold leading-5 text-ink/60">{copy}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="grid gap-2 sm:grid-cols-4">
+      <div className="mt-3 flex flex-wrap gap-2">
         <Button type="button" onClick={onCreateWishlist}>
           <Plus size={16} />
           Create wishlist
         </Button>
         <Link className="focus-ring inline-flex min-h-11 items-center justify-center rounded-2xl bg-mint px-4 py-2 text-sm font-extrabold text-spruce hover:bg-spruce hover:text-white" href="/profiles">
-          Add birthdays
-        </Link>
-        <Link className="focus-ring inline-flex min-h-11 items-center justify-center rounded-2xl border border-ink/10 bg-white px-4 py-2 text-sm font-extrabold text-ink hover:bg-blush" href="/onboarding">
-          Add people
+          <UsersRound size={16} />
+          My Bubble
         </Link>
         <Button type="button" variant="ghost" onClick={onInvite}>
           <UsersRound size={16} />
-          Invite people
+          Invite
         </Button>
         <Button type="button" variant="ghost" onClick={skip}>
           Skip for now
         </Button>
       </div>
-
-      <p className="rounded-2xl bg-blush p-3 text-xs font-bold leading-5 text-berry">
-        Giftly works best as a circle: your wishlists, people you buy for, shared events, and quick saved links all in one place.
-      </p>
     </section>
   );
 }

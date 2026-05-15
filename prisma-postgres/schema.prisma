@@ -97,6 +97,9 @@ model Connection {
   targetUser         User?            @relation("ConnectionTarget", fields: [targetUserId], references: [id], onDelete: SetNull)
   managedProfileId   String?
   managedProfile     Profile?         @relation("ManagedProfileConnection", fields: [managedProfileId], references: [id], onDelete: Cascade)
+  realName           String?
+  displayName        String?
+  relationshipType   String?
   emailOrPhone       String?
   status             ConnectionStatus @default(PENDING)
   source             ConnectionSource @default(MANUAL)
@@ -104,6 +107,7 @@ model Connection {
   customGroupLabel   String?
   groupMembers       GiftGroupMember[]
   wishlistShares     WishlistShare[]
+  wishlistShareExclusions WishlistShareExclusion[]
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
 
@@ -155,6 +159,7 @@ model WishlistShare {
   groupId       String?
   group         GiftGroup?  @relation(fields: [groupId], references: [id], onDelete: Cascade)
   accessLevel   String      @default("view")
+  exclusions    WishlistShareExclusion[]
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
@@ -162,6 +167,19 @@ model WishlistShare {
   @@index([profileId])
   @@index([connectionId])
   @@index([groupId])
+}
+
+model WishlistShareExclusion {
+  id           String        @id
+  shareId      String
+  share        WishlistShare @relation(fields: [shareId], references: [id], onDelete: Cascade)
+  connectionId String
+  connection   Connection    @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  createdAt    DateTime      @default(now())
+
+  @@index([shareId])
+  @@index([connectionId])
+  @@unique([shareId, connectionId])
 }
 
 model GiftItem {

@@ -1,22 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { Plus, QrCode, RotateCcw, Share2, Trash2 } from "lucide-react";
+import { Plus, Share2, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useGiftlyStore } from "@/lib/store";
 import { formatEventDate } from "@/lib/events";
 import type { GroupLabel } from "@/lib/types";
-import { bubbleInviteUrl, publicProfilePath, publicProfileUrl } from "@/lib/url";
+import { bubbleInviteUrl, publicProfilePath } from "@/lib/url";
 import { Avatar } from "./avatar";
-import { Button, Field, Input, Select, Textarea } from "./ui";
-import { QrCard } from "./qr-card";
+import { Button, Field, Input, Select } from "./ui";
 import { InviteModal } from "./invite-modal";
 
 export function ProfilesClient() {
   const { user, profiles, connections = [], groups = [], wishlistShares = [], actionError, actions, ready } = useGiftlyStore();
   const [showForm, setShowForm] = useState(false);
   const [shareSlug, setShareSlug] = useState("");
-  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const [vanityDrafts, setVanityDrafts] = useState<Record<string, string>>({});
   const [eventDrafts, setEventDrafts] = useState<Record<string, { birthday: string; anniversary: string }>>({});
   const [newGroupName, setNewGroupName] = useState("");
@@ -24,16 +22,13 @@ export function ProfilesClient() {
   const [groupMemberDrafts, setGroupMemberDrafts] = useState<Record<string, string>>({});
   const [shareGroupDrafts, setShareGroupDrafts] = useState<Record<string, string>>({});
   const [shareConnectionDrafts, setShareConnectionDrafts] = useState<Record<string, string>>({});
+  const [shareExcludeDrafts, setShareExcludeDrafts] = useState<Record<string, string[]>>({});
   const [vanityMessage, setVanityMessage] = useState("");
   const [eventMessage, setEventMessage] = useState("");
   const [form, setForm] = useState({
+    realName: "",
     displayName: "",
     relationship: "",
-    bio: "",
-    photoUrl: "",
-    birthday: "",
-    anniversary: "",
-    hasAccount: "no",
     emailOrPhone: "",
     groupLabel: "FAMILY" as GroupLabel,
     customGroupLabel: ""
@@ -41,28 +36,19 @@ export function ProfilesClient() {
 
   if (!ready) return <main className="mx-auto max-w-6xl px-4 py-10 font-bold">Loading your gift circle...</main>;
 
-  async function createProfile(event: React.FormEvent) {
+  async function createBubbleConnection(event: React.FormEvent) {
     event.preventDefault();
     try {
-      if (form.hasAccount === "yes") {
-        await actions.createConnection({
-          emailOrPhone: form.emailOrPhone,
-          groupLabel: form.groupLabel,
-          customGroupLabel: form.customGroupLabel
-        });
-      } else {
-        await actions.createProfile({
-          displayName: form.displayName,
-          relationship: form.relationship,
-          bio: form.bio,
-          photoUrl: form.photoUrl,
-          birthday: form.birthday,
-          anniversary: form.anniversary,
-          groupLabel: form.groupLabel,
-          customGroupLabel: form.customGroupLabel
-        });
-      }
-      setForm({ displayName: "", relationship: "", bio: "", photoUrl: "", birthday: "", anniversary: "", hasAccount: "no", emailOrPhone: "", groupLabel: "FAMILY", customGroupLabel: "" });
+      await actions.createConnection({
+        realName: form.realName,
+        displayName: form.displayName,
+        relationshipType: form.relationship,
+        emailOrPhone: form.emailOrPhone,
+        groupLabel: form.groupLabel,
+        customGroupLabel: form.customGroupLabel,
+        source: "MANUAL"
+      });
+      setForm({ realName: "", displayName: "", relationship: "", emailOrPhone: "", groupLabel: "FAMILY", customGroupLabel: "" });
       setShowForm(false);
     } catch {
       // The shared store surfaces the friendly error message.
@@ -70,20 +56,10 @@ export function ProfilesClient() {
   }
 
   async function deleteProfile(id: string, name: string) {
-    if (!window.confirm(`Delete ${name}? This will also delete that gift account's items, reservations, and contribution records.`)) return;
+    if (!window.confirm(`Delete ${name}? This will also delete that wishlist's items, reservations, and contribution records.`)) return;
     try {
       await actions.deleteProfile(id);
       if (profiles.find((profile) => profile.id === id)?.slug === shareSlug) setShareSlug("");
-    } catch {
-      // The shared store surfaces the friendly error message.
-    }
-  }
-
-  async function resetMyData() {
-    try {
-      await actions.resetMyGiftlyData();
-      setShareSlug("");
-      setResetConfirmOpen(false);
     } catch {
       // The shared store surfaces the friendly error message.
     }
@@ -108,7 +84,7 @@ export function ProfilesClient() {
     };
     try {
       await actions.updateProfileEvents(profileId, draft);
-      setEventMessage("Gift account dates saved.");
+      setEventMessage("Dates saved.");
     } catch {
       // The shared store surfaces the friendly error message.
     }
@@ -135,7 +111,7 @@ export function ProfilesClient() {
   async function inviteToGroup(groupId: string) {
     const value = groupInviteDrafts[groupId]?.trim();
     if (!value) return;
-    await actions.createConnection({ emailOrPhone: value, groupId, source: "EMAIL", groupLabel: "CUSTOM", customGroupLabel: groups.find((group) => group.id === groupId)?.name });
+    await actions.createConnection({ emailOrPhone: value, displayName: value, groupId, source: "EMAIL", groupLabel: "CUSTOM", customGroupLabel: groups.find((group) => group.id === groupId)?.name });
     setGroupInviteDrafts((current) => ({ ...current, [groupId]: "" }));
     await actions.refresh();
   }
@@ -151,7 +127,7 @@ export function ProfilesClient() {
   async function shareWithGroup(profileId: string) {
     const groupId = shareGroupDrafts[profileId];
     if (!groupId) return;
-    await actions.shareWishlist({ profileId, groupId });
+    await actions.shareWishlist({ profileId, groupId, excludedConnectionIds: shareExcludeDrafts[profileId] ?? [] });
     await actions.refresh();
   }
 
@@ -168,9 +144,11 @@ export function ProfilesClient() {
   const currentShareProfile = profiles.find((profile) => profile.slug === shareSlug);
 
   function connectionLabel(connection: (typeof connections)[number]) {
+    if (connection.displayName) return connection.displayName;
+    if (connection.realName) return connection.realName;
     if (connection.emailOrPhone) return connection.emailOrPhone;
     if (connection.targetUserId) return "Connected Giftly user";
-    return "Managed gift account";
+    return "Connected person";
   }
 
   function shareCountForProfile(profileId: string) {
@@ -178,133 +156,60 @@ export function ProfilesClient() {
   }
 
   return (
-    <main className="mx-auto grid max-w-6xl gap-6 px-4 py-6 lg:grid-cols-[1fr_22rem]">
+    <main className="mx-auto grid max-w-6xl gap-6 px-4 py-6">
       <section className="grid gap-4">
         {actionError ? <p className="rounded-2xl bg-blush p-3 text-sm font-bold text-berry">{actionError}</p> : null}
         <div className="flex flex-col gap-4 rounded-[2rem] border border-ink/10 bg-white p-4 shadow-soft sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-sm font-black uppercase text-berry">Your gifting circle</p>
-            <h1 className="text-3xl font-black">People You Gift For</h1>
+            <p className="text-sm font-black uppercase text-berry">My Bubble</p>
+            <h1 className="text-3xl font-black">Your gifting circle</h1>
             <p className="mt-1 text-sm font-semibold leading-6 text-ink/60">
-              Create gift accounts for family and friends, add events, invite them later, and transfer ownership when they join Giftly.
+              Your Bubble is everyone connected to you. People in your Bubble cannot automatically see your wishlists. You choose what to share and with whom.
             </p>
           </div>
           <Button type="button" onClick={() => setShowForm((value) => !value)}>
             <Plus size={17} />
-            Add Person
+            Add someone to your Bubble
           </Button>
         </div>
-        <section className="rounded-[2rem] border border-berry/20 bg-white p-4 shadow-sm">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-lg font-black">Reset My Giftly Data</h2>
-              <p className="mt-1 text-sm font-semibold leading-6 text-ink/60">
-                This is for local testing when you want a clean account without changing your login.
-              </p>
-            </div>
-            <Button type="button" variant="danger" onClick={() => setResetConfirmOpen(true)}>
-              <RotateCcw size={16} />
-              Reset
-            </Button>
-          </div>
-          {resetConfirmOpen ? (
-            <div className="mt-4 rounded-2xl bg-blush p-4">
-              <p className="text-sm font-bold leading-6 text-berry">
-                This will delete all your gift accounts, gift items, reservations, and contribution records. Your login account will remain.
-              </p>
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                <Button type="button" variant="ghost" onClick={() => setResetConfirmOpen(false)}>
-                  Cancel
-                </Button>
-                <Button type="button" variant="danger" onClick={resetMyData}>
-                  Confirm Reset
-                </Button>
-              </div>
-            </div>
-          ) : null}
-        </section>
         {showForm ? (
-          <form onSubmit={createProfile} className="grid gap-3 rounded-[2rem] border border-ink/10 bg-white p-4 shadow-soft">
-            <Field label="Does this person already have a Giftly account?">
-              <Select value={form.hasAccount} onChange={(event) => setForm({ ...form, hasAccount: event.target.value })}>
-                <option value="no">No, create a managed gift account for them</option>
-                <option value="yes">Yes, connect existing account</option>
-              </Select>
-            </Field>
-            {form.hasAccount === "yes" ? (
-              <div className="grid gap-3 rounded-3xl bg-cloud p-4">
-                <Field label="Email or mobile">
-                  <Input required value={form.emailOrPhone} onChange={(event) => setForm({ ...form, emailOrPhone: event.target.value })} />
-                </Field>
-                <div className="grid gap-2 sm:grid-cols-3">
-                  <Button type="button" variant="ghost">Send Invite</Button>
-                  <Button type="button" variant="ghost">Connection Code</Button>
-                  <Button type="button" variant="ghost">
-                    <QrCode size={16} />
-                    Scan QR
-                  </Button>
-                </div>
-                <p className="text-xs font-bold leading-5 text-ink/55">
-                  For MVP, saving this creates a pending connection request. Live sending, connection codes, and QR scanning come later.
-                </p>
-              </div>
-            ) : (
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="Display name">
-                  <Input required value={form.displayName} onChange={(event) => setForm({ ...form, displayName: event.target.value })} />
-                </Field>
-                <Field label="Relationship">
-                  <Input value={form.relationship} onChange={(event) => setForm({ ...form, relationship: event.target.value })} />
-                </Field>
-                <Field label="Photo URL">
-                  <Input value={form.photoUrl} onChange={(event) => setForm({ ...form, photoUrl: event.target.value })} placeholder="Leave blank for initials avatar" />
-                </Field>
-                <Field label="Birthday">
-                  <Input type="date" value={form.birthday} onChange={(event) => setForm({ ...form, birthday: event.target.value })} />
-                </Field>
-                <Field label="Anniversary">
-                  <Input type="date" value={form.anniversary} onChange={(event) => setForm({ ...form, anniversary: event.target.value })} />
-                </Field>
-                <Field label="Group">
-                  <Select value={form.groupLabel} onChange={(event) => setForm({ ...form, groupLabel: event.target.value as GroupLabel })}>
-                    {groupOptions.map((group) => (
-                      <option key={group} value={group}>{group}</option>
-                    ))}
-                  </Select>
-                </Field>
-              </div>
-            )}
-            {form.hasAccount === "yes" ? (
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="Group">
-                  <Select value={form.groupLabel} onChange={(event) => setForm({ ...form, groupLabel: event.target.value as GroupLabel })}>
-                    {groupOptions.map((group) => (
-                      <option key={group} value={group}>{group}</option>
-                    ))}
-                  </Select>
-                </Field>
-                {form.groupLabel === "CUSTOM" ? (
-                  <Field label="Custom group">
-                    <Input value={form.customGroupLabel} onChange={(event) => setForm({ ...form, customGroupLabel: event.target.value })} />
-                  </Field>
-                ) : null}
-              </div>
-            ) : form.groupLabel === "CUSTOM" ? (
-              <Field label="Custom group">
-                <Input value={form.customGroupLabel} onChange={(event) => setForm({ ...form, customGroupLabel: event.target.value })} />
+          <form onSubmit={createBubbleConnection} className="grid gap-3 rounded-[2rem] border border-ink/10 bg-white p-4 shadow-soft">
+            <div>
+              <h2 className="text-xl font-black">Add someone to your Bubble</h2>
+              <p className="mt-1 text-sm font-semibold leading-6 text-ink/60">
+                Add a real person, send them an invite link, and keep your own label for them. They create their own Giftly account when they join.
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Real name">
+                <Input required value={form.realName} onChange={(event) => setForm({ ...form, realName: event.target.value })} placeholder="Kevin Foster" />
               </Field>
-            ) : null}
-            {form.hasAccount === "no" ? (
-              <>
-                <Field label="Bio / notes">
-                  <Textarea value={form.bio} onChange={(event) => setForm({ ...form, bio: event.target.value })} />
+              <Field label="Display name">
+                <Input required value={form.displayName} onChange={(event) => setForm({ ...form, displayName: event.target.value })} placeholder="Dad" />
+              </Field>
+              <Field label="Relationship">
+                <Input required value={form.relationship} onChange={(event) => setForm({ ...form, relationship: event.target.value })} placeholder="Father" />
+              </Field>
+              <Field label="Email or phone">
+                <Input required value={form.emailOrPhone} onChange={(event) => setForm({ ...form, emailOrPhone: event.target.value })} placeholder="name@example.com or mobile" />
+              </Field>
+              <Field label="Group">
+                <Select value={form.groupLabel} onChange={(event) => setForm({ ...form, groupLabel: event.target.value as GroupLabel })}>
+                  {groupOptions.map((group) => (
+                    <option key={group} value={group}>{group}</option>
+                  ))}
+                </Select>
+              </Field>
+              {form.groupLabel === "CUSTOM" ? (
+                <Field label="Custom group">
+                  <Input value={form.customGroupLabel} onChange={(event) => setForm({ ...form, customGroupLabel: event.target.value })} />
                 </Field>
-                <p className="rounded-2xl bg-cloud p-3 text-xs font-bold leading-5 text-ink/55">
-                  Giftly will generate the public link automatically. This can start as a managed wishlist, then later be invited, claimed, or transferred when the person joins.
-                </p>
-              </>
-            ) : null}
-            <Button type="submit">{form.hasAccount === "yes" ? "Create Pending Connection" : "Save Gift Account"}</Button>
+              ) : null}
+            </div>
+            <p className="rounded-2xl bg-cloud p-3 text-xs font-bold leading-5 text-ink/55">
+              Saving creates a pending Bubble connection. They will join through an invite link and manage their own account; you still see your personal label, like Dad or Coach.
+            </p>
+            <Button type="submit">Save and create invite</Button>
           </form>
         ) : null}
         {connections.length ? (
@@ -447,7 +352,7 @@ export function ProfilesClient() {
                 </div>
               ) : profile.isManagedProfile ? (
                 <p className="mt-4 rounded-2xl bg-cloud p-3 text-xs font-bold text-ink/55">
-                  This is a managed gift account. If this person joins Giftly later, they can connect to it and ownership can be transferred after a safe claim flow.
+                  This wishlist is managed by you for now. If this person joins Giftly later, they can connect and claim it through a safe ownership flow.
                 </p>
               ) : null}
               <div className="mt-4 grid gap-3 rounded-2xl bg-cloud p-3">
@@ -466,6 +371,32 @@ export function ProfilesClient() {
                   </Select>
                   <Button type="button" variant="ghost" onClick={() => shareWithGroup(profile.id)}>Share</Button>
                 </div>
+                {shareGroupDrafts[profile.id] ? (
+                  <div className="rounded-2xl bg-white p-3">
+                    <p className="text-xs font-black uppercase text-ink/45">Except selected people</p>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                      {bubbleConnections.map((connection) => {
+                        const selected = (shareExcludeDrafts[profile.id] ?? []).includes(connection.id);
+                        return (
+                          <label className="flex items-center gap-2 text-xs font-bold text-ink/60" key={connection.id}>
+                            <input
+                              type="checkbox"
+                              checked={selected}
+                              onChange={(event) => {
+                                const current = shareExcludeDrafts[profile.id] ?? [];
+                                setShareExcludeDrafts({
+                                  ...shareExcludeDrafts,
+                                  [profile.id]: event.target.checked ? [...current, connection.id] : current.filter((id) => id !== connection.id)
+                                });
+                              }}
+                            />
+                            {connectionLabel(connection)}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
                 <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
                   <Select value={shareConnectionDrafts[profile.id] ?? ""} onChange={(event) => setShareConnectionDrafts({ ...shareConnectionDrafts, [profile.id]: event.target.value })}>
                     <option value="">Share with person</option>
@@ -497,18 +428,6 @@ export function ProfilesClient() {
           ))}
         </div>
       </section>
-      <aside className="lg:sticky lg:top-24 lg:self-start">
-        {shareSlug ? (
-          <QrCard url={publicProfileUrl(shareSlug)} />
-        ) : (
-          <div className="rounded-[2rem] border border-ink/10 bg-white p-6 shadow-soft">
-            <h2 className="text-xl font-black">QR sharing</h2>
-            <p className="mt-2 font-semibold leading-7 text-ink/65">
-              Choose Share on any gift account to generate a QR code and copyable public wishlist link.
-            </p>
-          </div>
-        )}
-      </aside>
       <InviteModal
         open={Boolean(shareSlug)}
         title="Share this wishlist"

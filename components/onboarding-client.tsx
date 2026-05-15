@@ -182,7 +182,7 @@ export function OnboardingClient() {
       <section className="grid gap-3 rounded-[2rem] border border-ink/10 bg-white p-4 shadow-soft">
         <div className="flex items-center gap-2">
           <UsersRound size={18} className="text-berry" />
-          <h2 className="text-xl font-black">People and events</h2>
+          <h2 className="text-xl font-black">Your Bubble and events</h2>
         </div>
 
         <div className="grid gap-3">

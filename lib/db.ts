@@ -12,7 +12,9 @@ type DbReservation = Awaited<ReturnType<typeof prisma.reservation.findFirst>>;
 type DbConnection = Awaited<ReturnType<typeof prisma.connection.findFirst>>;
 type DbGiftGroup = NonNullable<Awaited<ReturnType<typeof prisma.giftGroup.findFirst>>> & { members?: NonNullable<Awaited<ReturnType<typeof prisma.giftGroupMember.findFirst>>>[] };
 type DbGiftGroupMember = Awaited<ReturnType<typeof prisma.giftGroupMember.findFirst>>;
-type DbWishlistShare = Awaited<ReturnType<typeof prisma.wishlistShare.findFirst>>;
+type DbWishlistShare = NonNullable<Awaited<ReturnType<typeof prisma.wishlistShare.findFirst>>> & {
+  exclusions?: { connectionId: string }[];
+};
 type DbGiftEvent = Awaited<ReturnType<typeof prisma.giftEvent.findFirst>>;
 type DbRecommendedProduct = Awaited<ReturnType<typeof prisma.recommendedProduct.findFirst>>;
 type DbAffiliateProgram = Awaited<ReturnType<typeof prisma.affiliateProgram.findFirst>>;
@@ -100,6 +102,9 @@ export function toConnection(connection: NonNullable<DbConnection>): Connection 
     requesterUserId: connection.requesterUserId,
     targetUserId: connection.targetUserId ?? undefined,
     managedProfileId: connection.managedProfileId ?? undefined,
+    realName: connection.realName ?? undefined,
+    displayName: connection.displayName ?? undefined,
+    relationshipType: connection.relationshipType ?? undefined,
     emailOrPhone: connection.emailOrPhone ?? undefined,
     status: connection.status as Connection["status"],
     source: connection.source as ConnectionSource,
@@ -134,7 +139,7 @@ export function toGiftGroup(group: DbGiftGroup): GiftGroup {
   };
 }
 
-export function toWishlistShare(share: NonNullable<DbWishlistShare>): WishlistShare {
+export function toWishlistShare(share: DbWishlistShare): WishlistShare {
   return {
     id: share.id,
     ownerUserId: share.ownerUserId,
@@ -142,6 +147,7 @@ export function toWishlistShare(share: NonNullable<DbWishlistShare>): WishlistSh
     connectionId: share.connectionId ?? undefined,
     groupId: share.groupId ?? undefined,
     accessLevel: share.accessLevel,
+    excludedConnectionIds: (share.exclusions ?? []).map((exclusion) => exclusion.connectionId),
     createdAt: dateString(share.createdAt),
     updatedAt: dateString(share.updatedAt)
   };
@@ -424,6 +430,7 @@ export async function getOwnerStore(user: User) {
     }),
     prisma.wishlistShare.findMany({
       where: { ownerUserId: user.id },
+      include: { exclusions: true },
       orderBy: { createdAt: "desc" }
     })
   ]);
@@ -535,9 +542,19 @@ export const createProfile = createManagedProfile;
 
 export async function createPendingConnection(
   user: User,
-  input: { emailOrPhone?: string; groupLabel?: GroupLabel; customGroupLabel?: string; groupId?: string; source?: ConnectionSource }
+  input: {
+    realName?: string;
+    displayName?: string;
+    relationshipType?: string;
+    emailOrPhone?: string;
+    groupLabel?: GroupLabel;
+    customGroupLabel?: string;
+    groupId?: string;
+    source?: ConnectionSource;
+  }
 ) {
   const stamp = new Date();
+  if (!input.emailOrPhone?.trim()) throw new Error("CONTACT_REQUIRED");
   const targetUser = input.emailOrPhone?.includes("@")
     ? await prisma.user.findUnique({ where: { email: input.emailOrPhone.trim().toLowerCase() } })
     : null;
@@ -547,6 +564,9 @@ export async function createPendingConnection(
       id: `connection_${randomUUID()}`,
       requesterUserId: user.id,
       targetUserId: targetUser?.id ?? null,
+      realName: input.realName?.trim() || null,
+      displayName: input.displayName?.trim() || input.realName?.trim() || input.emailOrPhone?.trim() || null,
+      relationshipType: input.relationshipType?.trim() || null,
       emailOrPhone: input.emailOrPhone?.trim() || null,
       status: targetUser ? "ACCEPTED" : "PENDING",
       source: (input.source ?? "MANUAL") as DbConnectionSource,
@@ -636,9 +656,10 @@ export async function addConnectionToGroup(
   return toGiftGroupMember(member);
 }
 
-export async function shareWishlist(user: User, input: { profileId: string; connectionId?: string; groupId?: string }) {
+export async function shareWishlist(user: User, input: { profileId: string; connectionId?: string; groupId?: string; excludedConnectionIds?: string[] }) {
   if (!(await ownsProfile(user.id, input.profileId))) throw new Error("FORBIDDEN");
   if (!input.connectionId && !input.groupId) throw new Error("INVALID_SHARE_TARGET");
+  const excludedConnectionIds = Array.from(new Set((input.excludedConnectionIds ?? []).filter(Boolean)));
 
   if (input.connectionId) {
     const ownsConnection = await prisma.connection.count({ where: { id: input.connectionId, requesterUserId: user.id } });
@@ -648,6 +669,15 @@ export async function shareWishlist(user: User, input: { profileId: string; conn
     const ownsGroup = await prisma.giftGroup.count({ where: { id: input.groupId, ownerUserId: user.id } });
     if (!ownsGroup) throw new Error("FORBIDDEN");
   }
+  if (excludedConnectionIds.length) {
+    const ownedExclusions = await prisma.connection.count({
+      where: {
+        requesterUserId: user.id,
+        id: { in: excludedConnectionIds }
+      }
+    });
+    if (ownedExclusions !== excludedConnectionIds.length) throw new Error("FORBIDDEN");
+  }
 
   const existing = await prisma.wishlistShare.findFirst({
     where: {
@@ -655,9 +685,26 @@ export async function shareWishlist(user: User, input: { profileId: string; conn
       profileId: input.profileId,
       connectionId: input.connectionId || null,
       groupId: input.groupId || null
-    }
+    },
+    include: { exclusions: true }
   });
-  if (existing) return toWishlistShare(existing);
+  if (existing) {
+    if (input.excludedConnectionIds) {
+      await prisma.wishlistShareExclusion.deleteMany({ where: { shareId: existing.id } });
+      if (excludedConnectionIds.length) {
+        await prisma.wishlistShareExclusion.createMany({
+          data: excludedConnectionIds.map((connectionId) => ({
+            id: `share_exclusion_${randomUUID()}`,
+            shareId: existing.id,
+            connectionId
+          }))
+        });
+      }
+      const updated = await prisma.wishlistShare.findUnique({ where: { id: existing.id }, include: { exclusions: true } });
+      if (updated) return toWishlistShare(updated);
+    }
+    return toWishlistShare(existing);
+  }
 
   const stamp = new Date();
   const share = await prisma.wishlistShare.create({
@@ -672,7 +719,18 @@ export async function shareWishlist(user: User, input: { profileId: string; conn
       updatedAt: stamp
     }
   });
-  return toWishlistShare(share);
+  if (excludedConnectionIds.length) {
+    await prisma.wishlistShareExclusion.createMany({
+      data: excludedConnectionIds.map((connectionId) => ({
+        id: `share_exclusion_${randomUUID()}`,
+        shareId: share.id,
+        connectionId
+      }))
+    });
+    const shareWithExclusions = await prisma.wishlistShare.findUnique({ where: { id: share.id }, include: { exclusions: true } });
+    if (shareWithExclusions) return toWishlistShare(shareWithExclusions);
+  }
+  return toWishlistShare({ ...share, exclusions: [] });
 }
 
 export async function acceptBubbleInvite(

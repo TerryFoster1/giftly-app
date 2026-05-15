@@ -50,6 +50,9 @@ export type Connection = {
   requesterUserId: string;
   targetUserId?: string;
   managedProfileId?: string;
+  realName?: string;
+  displayName?: string;
+  relationshipType?: string;
   emailOrPhone?: string;
   status: ConnectionStatus;
   source: ConnectionSource;
@@ -86,6 +89,7 @@ export type WishlistShare = {
   connectionId?: string;
   groupId?: string;
   accessLevel: string;
+  excludedConnectionIds: string[];
   createdAt: string;
   updatedAt: string;
 };

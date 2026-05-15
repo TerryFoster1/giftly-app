@@ -119,7 +119,7 @@ export function useGiftlyStore() {
           return created;
         });
       },
-      async createConnection(input: { emailOrPhone?: string; groupLabel?: GroupLabel; customGroupLabel?: string; groupId?: string; source?: ConnectionSource }) {
+      async createConnection(input: { realName?: string; displayName?: string; relationshipType?: string; emailOrPhone?: string; groupLabel?: GroupLabel; customGroupLabel?: string; groupId?: string; source?: ConnectionSource }) {
         return runAction(async () => {
           const created = await requestJson<Connection>("/api/connections", {
             method: "POST",
@@ -154,7 +154,7 @@ export function useGiftlyStore() {
           return member;
         });
       },
-      async shareWishlist(input: { profileId: string; connectionId?: string; groupId?: string }) {
+      async shareWishlist(input: { profileId: string; connectionId?: string; groupId?: string; excludedConnectionIds?: string[] }) {
         return runAction(async () => {
           const share = await requestJson<WishlistShare>("/api/wishlist-shares", {
             method: "POST",

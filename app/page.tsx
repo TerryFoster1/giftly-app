@@ -4,7 +4,7 @@ import { AppShell } from "@/components/shell";
 
 const features = [
   ["Save all year", "Paste or enter ideas when they pop up, then sort them by occasion and want level."],
-  ["Share by QR", "Every gift account gets a public wishlist link and QR card for friends and family."],
+  ["Share by QR", "Every wishlist gets a public link and QR card for friends and family."],
   ["Build your circle", "Add the people you buy for most, then invite or transfer ownership later."],
   ["Keep surprises", "Private and hidden ideas stay out of the public wishlist view."]
 ];
