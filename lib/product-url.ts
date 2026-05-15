@@ -26,3 +26,25 @@ export function isAmazonUrl(input: string) {
     return false;
   }
 }
+
+export function normalizeAmazonProductUrl(input: string) {
+  const normalized = normalizeProductUrl(input);
+  if (normalized.error || !normalized.url || !isAmazonUrl(normalized.url)) return normalized;
+
+  try {
+    const url = new URL(normalized.url);
+    const asinFromPath = url.pathname.match(/\/(?:dp|gp\/product|exec\/obidos\/ASIN)\/([A-Z0-9]{10})(?:[/?]|$)/i)?.[1];
+    if (asinFromPath) {
+      url.pathname = `/dp/${asinFromPath.toUpperCase()}`;
+    }
+
+    for (const key of Array.from(url.searchParams.keys())) {
+      if (key !== "tag") url.searchParams.delete(key);
+    }
+
+    url.hash = "";
+    return { url: url.toString() };
+  } catch {
+    return normalized;
+  }
+}

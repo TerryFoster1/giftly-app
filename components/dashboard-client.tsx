@@ -9,6 +9,7 @@ import { type GiftItem, type GroupLabel, type Profile, type RecommendedProduct }
 import { normalizeProductUrl } from "@/lib/product-url";
 import { publicProfileUrl } from "@/lib/url";
 import { InviteModal } from "./invite-modal";
+import { OnboardingCard } from "./onboarding-card";
 import { Button, Field, Input, Select } from "./ui";
 
 const fallbackImage = "https://images.unsplash.com/photo-1513201099705-a9746e1e201f?q=80&w=600&auto=format&fit=crop";
@@ -314,6 +315,13 @@ export function DashboardClient() {
 
       {giftMessage ? <p className="rounded-2xl bg-mint p-3 text-sm font-bold text-spruce">{giftMessage}</p> : null}
       {actionError ? <p className="rounded-2xl bg-blush p-3 text-sm font-bold text-berry">{actionError}</p> : null}
+
+      <OnboardingCard
+        userName={user?.name}
+        wishlistCount={profiles.length}
+        onCreateWishlist={() => setCreateListOpen(true)}
+        onInvite={() => openShareModal("existing")}
+      />
 
       <section className="grid gap-3">
         <div className="flex items-end justify-between gap-3">

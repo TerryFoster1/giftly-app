@@ -15,6 +15,7 @@ export default async function GiftDetailPage({ params }: { params: { id: string 
 
   const { gift, profile } = detail;
   const priceLabel = gift.currency ? `${gift.currency} $${gift.price.toFixed(2)}` : gift.price ? gift.price.toFixed(2) : "Price not saved";
+  const buyUrl = gift.affiliateUrl || gift.monetizedUrl || gift.productUrl;
   const description =
     gift.notes ||
     "A saved gift idea for this wishlist. Add notes when you want to remember size, color, timing, or why this would be a thoughtful pick.";
@@ -56,7 +57,7 @@ export default async function GiftDetailPage({ params }: { params: { id: string 
 
             <a
               className="focus-ring inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-coral px-4 py-2 text-sm font-extrabold text-white hover:bg-berry"
-              href={gift.productUrl}
+              href={buyUrl}
               rel="noreferrer"
               target="_blank"
             >

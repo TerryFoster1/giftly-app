@@ -52,12 +52,11 @@ export function WishlistDetailClient({ slug }: { slug: string }) {
 
   const selectedProfile = useMemo(() => profiles.find((profile) => profile.slug === slug), [profiles, slug]);
   const wishlistStats = useMemo(() => {
-    if (!selectedProfile) return { total: 0, shared: 0, reserved: 0 };
+    if (!selectedProfile) return { total: 0, shared: 0 };
     const profileGifts = gifts.filter((gift) => gift.profileId === selectedProfile.id);
     return {
       total: profileGifts.length,
-      shared: profileGifts.filter((gift) => gift.visibility !== "private").length,
-      reserved: profileGifts.filter((gift) => gift.reservedStatus === "reserved").length
+      shared: profileGifts.filter((gift) => gift.visibility !== "private").length
     };
   }, [gifts, selectedProfile]);
   const displayFirstName = selectedProfile?.displayName.split(" ")[0] ?? "Their";
@@ -216,7 +215,6 @@ export function WishlistDetailClient({ slug }: { slug: string }) {
               <span className="rounded-full bg-cloud px-3 py-1">{wishlistStats.total} {wishlistStats.total === 1 ? "idea" : "ideas"}</span>
               <span className="rounded-full bg-blush px-3 py-1 text-berry">Shared with family & friends</span>
               <span className="rounded-full bg-cloud px-3 py-1">{wishlistStats.shared} shareable</span>
-              <span className="rounded-full bg-mint px-3 py-1 text-spruce">{wishlistStats.reserved} planned</span>
             </div>
           </div>
           <div className="flex flex-col gap-2 sm:items-end">

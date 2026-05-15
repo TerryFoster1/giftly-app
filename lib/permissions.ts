@@ -14,7 +14,7 @@ export function giftsVisibleToPublic(profile: Profile, gifts: GiftItem[]) {
     (gift) =>
       gift.profileId === profile.id &&
       gift.visibility === "public" &&
-      !gift.purchasedStatus
+      !gift.hiddenFromRecipient
   );
 }
 
@@ -22,7 +22,9 @@ export function publicGiftView(gift: GiftItem) {
   return {
     id: gift.id,
     title: gift.title,
-    productUrl: gift.monetizedUrl || gift.productUrl,
+    productUrl: gift.affiliateUrl || gift.monetizedUrl || gift.productUrl,
+    affiliateUrl: gift.affiliateUrl,
+    monetizedUrl: gift.monetizedUrl,
     storeName: gift.storeName,
     imageUrl: gift.imageUrl,
     price: gift.price,
@@ -32,6 +34,7 @@ export function publicGiftView(gift: GiftItem) {
     allowContributions: gift.allowContributions,
     fundingGoalAmount: gift.fundingGoalAmount,
     currentContributionAmount: gift.currentContributionAmount,
-    reservedStatus: gift.reservedStatus
+    reservedStatus: gift.reservedStatus,
+    purchasedStatus: gift.purchasedStatus
   };
 }

@@ -49,6 +49,7 @@ export function PublicProfileClient({ slug }: { slug: string }) {
   function submitReservation(event: React.FormEvent) {
     event.preventDefault();
     if (!reserveGift || !reserver.name) return;
+    if (reserveGift.purchasedStatus || reserveGift.reservedStatus === "reserved") return;
     fetch("/api/reservations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

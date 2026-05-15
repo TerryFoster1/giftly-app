@@ -30,6 +30,8 @@ export function GiftCard({
   const priceLabel = gift.currency ? `${gift.currency} $${gift.price.toFixed(2)}` : gift.price ? gift.price.toFixed(2) : "Price not saved";
   const metaLabel = [gift.storeName, priceLabel].filter(Boolean).join(" / ");
   const detailPath = `/gifts/${gift.id}`;
+  const buyUrl = gift.affiliateUrl || gift.monetizedUrl || gift.productUrl;
+  const unavailableToViewer = publicMode && (gift.purchasedStatus || gift.reservedStatus === "reserved");
   const image = (
     <div className="aspect-[6/4] bg-cloud">
       <img src={gift.imageUrl} alt="" className="h-full w-full object-cover" />
@@ -64,12 +66,10 @@ export function GiftCard({
                 hidden
               </span>
             ) : null}
-            {gift.reservedStatus === "reserved" ? <span className="rounded-full bg-mint px-2 py-0.5 text-spruce">reserved</span> : null}
-            {gift.purchasedStatus ? <span className="rounded-full bg-honey/40 px-2 py-0.5">purchased</span> : null}
           </div>
         ) : (
           <p className="rounded-2xl bg-cloud p-2 text-xs font-bold text-ink/65">
-            {gift.reservedStatus === "reserved" ? "This gift is already reserved." : "Available to reserve."}
+            {gift.purchasedStatus ? "This gift has already been purchased." : gift.reservedStatus === "reserved" ? "This gift is already reserved." : "Available to reserve."}
           </p>
         )}
 
@@ -92,17 +92,23 @@ export function GiftCard({
         <div className="grid gap-2">
           {publicMode ? (
             <>
-              <a
-                className="focus-ring inline-flex min-h-10 items-center justify-center gap-2 rounded-2xl bg-coral px-3 py-2 text-sm font-extrabold text-white hover:bg-berry"
-                href={gift.productUrl}
-                target="_blank"
-              >
-                <ExternalLink size={16} />
-                Buy from Store
-              </a>
-              {gift.reservedStatus === "reserved" ? (
+              {unavailableToViewer ? (
+                <button type="button" className="min-h-10 rounded-2xl bg-cloud px-3 py-2 text-sm font-extrabold text-ink/45" disabled>
+                  {gift.purchasedStatus ? "Purchased" : "Reserved"}
+                </button>
+              ) : (
+                <a
+                  className="focus-ring inline-flex min-h-10 items-center justify-center gap-2 rounded-2xl bg-coral px-3 py-2 text-sm font-extrabold text-white hover:bg-berry"
+                  href={buyUrl}
+                  target="_blank"
+                >
+                  <ExternalLink size={16} />
+                  Buy from Store
+                </a>
+              )}
+              {unavailableToViewer ? (
                 <button type="button" className="min-h-9 rounded-2xl border border-ink/10 bg-white px-3 text-xs font-black text-ink/45" disabled>
-                  Reserved
+                  Already planned
                 </button>
               ) : (
                 <button
@@ -131,11 +137,11 @@ export function GiftCard({
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs font-black text-ink/55">
                 <button type="button" className="inline-flex items-center gap-1 hover:text-spruce" onClick={() => onToggleReserved?.(gift)}>
                   <Check size={13} />
-                  {gift.reservedStatus === "reserved" ? "Unreserve" : "Reserve"}
+                  Reserve
                 </button>
                 <button type="button" className="inline-flex items-center gap-1 hover:text-spruce" onClick={() => onTogglePurchased?.(gift)}>
                   <Check size={13} />
-                  {gift.purchasedStatus ? "Unbuy" : "Purchased"}
+                  Purchased
                 </button>
                 <button type="button" className="inline-flex items-center gap-1 hover:text-spruce" onClick={() => onEdit?.(gift)}>
                   <Edit3 size={13} />

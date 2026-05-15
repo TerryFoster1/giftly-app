@@ -1,6 +1,7 @@
 import { EventTag as DbEventTag, GroupLabel as DbGroupLabel, Prisma } from "@prisma/client";
 import { randomUUID } from "crypto";
 import { userHasAdminAccess } from "./auth";
+import { normalizeAmazonProductUrl } from "./product-url";
 import { prisma } from "./prisma";
 import type { AdminOverview, AffiliateProgram, Connection, EventTag, GiftItem, GroupLabel, Profile, RecommendedProduct, Reservation, User } from "./types";
 
@@ -291,7 +292,8 @@ function amazonAffiliateUrl(productUrl: string, trackingTag: string) {
   const tag = trackingTag.trim();
   if (!tag || !isAmazonUrl(productUrl)) return "";
   try {
-    const url = new URL(productUrl);
+    const normalized = normalizeAmazonProductUrl(productUrl);
+    const url = new URL(normalized.url || productUrl);
     url.searchParams.set("tag", tag);
     return url.toString();
   } catch {
@@ -511,13 +513,18 @@ export async function upsertGift(user: User, gift: GiftItem) {
     throw new Error("FORBIDDEN");
   }
 
+  const normalizedAmazonUrl = isAmazonUrl(gift.productUrl || gift.originalUrl) ? normalizeAmazonProductUrl(gift.productUrl || gift.originalUrl).url : undefined;
+  const productUrl = normalizedAmazonUrl || gift.productUrl;
+  const originalUrl = normalizedAmazonUrl || gift.originalUrl;
   const amazonTag = gift.affiliateUrl ? "" : await getActiveAmazonTrackingTag();
-  const generatedAffiliateUrl = amazonAffiliateUrl(gift.productUrl || gift.originalUrl, amazonTag);
+  const generatedAffiliateUrl = amazonAffiliateUrl(productUrl || originalUrl, amazonTag);
   const data = giftToDb(
     {
       ...gift,
+      productUrl,
+      originalUrl,
       affiliateUrl: gift.affiliateUrl || generatedAffiliateUrl || undefined,
-      monetizedUrl: gift.affiliateUrl || generatedAffiliateUrl || gift.monetizedUrl,
+      monetizedUrl: gift.affiliateUrl || generatedAffiliateUrl || gift.monetizedUrl || productUrl,
       affiliateStatus: generatedAffiliateUrl ? "converted" : gift.affiliateStatus
     },
     user.id
@@ -623,8 +630,7 @@ export async function getPublicProfile(slug: string) {
     where: {
       profileId: profile.id,
       visibility: "public",
-      hiddenFromRecipient: false,
-      purchasedStatus: false
+      hiddenFromRecipient: false
     },
     orderBy: [{ wantRating: "desc" }, { createdAt: "desc" }]
   });
@@ -673,6 +679,8 @@ export async function listActiveRecommendedProducts() {
 export async function upsertRecommendedProduct(user: User, input: Partial<RecommendedProduct>) {
   if (!userHasAdminAccess(user)) throw new Error("FORBIDDEN");
   const data = normalizeRecommendedProductInput(input, user.id);
+  const normalizedAmazonUrl = isAmazonUrl(data.originalUrl) ? normalizeAmazonProductUrl(data.originalUrl).url : undefined;
+  if (normalizedAmazonUrl) data.originalUrl = normalizedAmazonUrl;
   if (!data.affiliateUrl && isAmazonUrl(data.originalUrl)) {
     const generated = amazonAffiliateUrl(data.originalUrl, await getActiveAmazonTrackingTag());
     if (generated) {
