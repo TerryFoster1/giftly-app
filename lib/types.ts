@@ -11,6 +11,7 @@ export type EventTag =
 export type ReservationStatus = "available" | "reserved";
 export type GroupLabel = "FAMILY" | "FRIENDS" | "PARTNER" | "GUESTS" | "CUSTOM";
 export type ConnectionStatus = "PENDING" | "ACCEPTED" | "REJECTED";
+export type ConnectionSource = "QR" | "INVITE_LINK" | "EMAIL" | "MANUAL";
 export type PrimaryEventType = "BIRTHDAY" | "WEDDING" | "BABY" | "GENERAL";
 export type GiftEventType = "BIRTHDAY" | "ANNIVERSARY" | "WEDDING" | "BABY_SHOWER" | "HOLIDAY" | "CUSTOM";
 export type RecommendedAffiliateStatus = "none" | "matched" | "needs_review" | "manual";
@@ -51,8 +52,40 @@ export type Connection = {
   managedProfileId?: string;
   emailOrPhone?: string;
   status: ConnectionStatus;
+  source: ConnectionSource;
   groupLabel: GroupLabel;
   customGroupLabel?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type GiftGroupMember = {
+  id: string;
+  groupId: string;
+  connectionId?: string;
+  connectedUserId?: string;
+  pendingEmailOrPhone?: string;
+  status: ConnectionStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type GiftGroup = {
+  id: string;
+  ownerUserId: string;
+  name: string;
+  members: GiftGroupMember[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type WishlistShare = {
+  id: string;
+  ownerUserId: string;
+  profileId: string;
+  connectionId?: string;
+  groupId?: string;
+  accessLevel: string;
   createdAt: string;
   updatedAt: string;
 };

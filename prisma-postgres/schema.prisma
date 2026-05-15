@@ -22,6 +22,9 @@ model User {
   recommendedProducts RecommendedProduct[] @relation("RecommendedProductCreator")
   requestedConnections Connection[] @relation("ConnectionRequester")
   targetedConnections Connection[] @relation("ConnectionTarget")
+  ownedGroups GiftGroup[] @relation("GiftGroupOwner")
+  groupMemberships GiftGroupMember[] @relation("GiftGroupMemberUser")
+  wishlistShares WishlistShare[] @relation("WishlistShareOwner")
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 }
@@ -57,6 +60,7 @@ model Profile {
   isManagedProfile Boolean @default(true)
   gifts       GiftItem[]
   events      GiftEvent[]
+  wishlistShares WishlistShare[]
   managedConnections Connection[] @relation("ManagedProfileConnection")
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
@@ -95,14 +99,69 @@ model Connection {
   managedProfile     Profile?         @relation("ManagedProfileConnection", fields: [managedProfileId], references: [id], onDelete: Cascade)
   emailOrPhone       String?
   status             ConnectionStatus @default(PENDING)
+  source             ConnectionSource @default(MANUAL)
   groupLabel         GroupLabel       @default(FAMILY)
   customGroupLabel   String?
+  groupMembers       GiftGroupMember[]
+  wishlistShares     WishlistShare[]
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
 
   @@index([requesterUserId])
   @@index([targetUserId])
   @@index([managedProfileId])
+}
+
+model GiftGroup {
+  id            String   @id
+  ownerUserId   String
+  owner         User     @relation("GiftGroupOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  name          String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  members       GiftGroupMember[]
+  wishlistShares WishlistShare[]
+
+  @@index([ownerUserId])
+  @@unique([ownerUserId, name])
+}
+
+model GiftGroupMember {
+  id                  String           @id
+  groupId             String
+  group               GiftGroup        @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  connectionId         String?
+  connection           Connection?      @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  connectedUserId      String?
+  connectedUser        User?            @relation("GiftGroupMemberUser", fields: [connectedUserId], references: [id], onDelete: SetNull)
+  pendingEmailOrPhone  String?
+  status              ConnectionStatus @default(PENDING)
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  @@index([groupId])
+  @@index([connectionId])
+  @@index([connectedUserId])
+}
+
+model WishlistShare {
+  id            String      @id
+  ownerUserId   String
+  owner         User        @relation("WishlistShareOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  profileId     String
+  profile       Profile     @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  connectionId  String?
+  connection    Connection? @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  groupId       String?
+  group         GiftGroup?  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  accessLevel   String      @default("view")
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([ownerUserId])
+  @@index([profileId])
+  @@index([connectionId])
+  @@index([groupId])
 }
 
 model GiftItem {
@@ -261,6 +320,13 @@ enum ConnectionStatus {
   PENDING
   ACCEPTED
   REJECTED
+}
+
+enum ConnectionSource {
+  QR
+  INVITE_LINK
+  EMAIL
+  MANUAL
 }
 
 enum GroupLabel {

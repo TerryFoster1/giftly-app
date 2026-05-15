@@ -1,12 +1,10 @@
 "use client";
 
-import { Copy, Mail, QrCode, Share2, UsersRound, X } from "lucide-react";
+import { Copy, Mail, Share2, UsersRound, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import type { GroupLabel } from "@/lib/types";
+import type { GiftGroup, GroupLabel } from "@/lib/types";
 import { Button, Field, Input, Select } from "./ui";
 import { QrCard } from "./qr-card";
-
-const standardGroups = ["Family", "Friends"];
 
 function isStaleDemoGroup(label: string) {
   const normalized = label.trim().toLowerCase();
@@ -28,27 +26,38 @@ type InviteModalProps = {
   title?: string;
   profileUrl: string;
   existingGroups: string[];
+  groups?: GiftGroup[];
   initialMode?: "existing" | "new";
   onClose: () => void;
-  onInvite: (input: { emailOrPhone?: string; groupLabel: GroupLabel; customGroupLabel?: string }) => Promise<void>;
+  onCreateGroup?: (name: string) => Promise<GiftGroup>;
+  onInvite: (input: { emailOrPhone?: string; groupLabel: GroupLabel; customGroupLabel?: string; groupId?: string }) => Promise<void>;
 };
 
-export function InviteModal({ open, title = "Invite Friends & Family", profileUrl, existingGroups, initialMode = "existing", onClose, onInvite }: InviteModalProps) {
+export function InviteModal({ open, title = "Invite Friends & Family", profileUrl, existingGroups, groups = [], initialMode = "existing", onClose, onCreateGroup, onInvite }: InviteModalProps) {
   const [emailOrPhone, setEmailOrPhone] = useState("");
   const [mode, setMode] = useState<"existing" | "new">("existing");
-  const [selectedGroup, setSelectedGroup] = useState("Family");
+  const [selectedGroupId, setSelectedGroupId] = useState("");
   const [newGroup, setNewGroup] = useState("");
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
 
   const groupOptions = useMemo(() => {
-    const names = Array.from(new Set([...standardGroups, ...existingGroups].filter((name) => Boolean(name) && !isStaleDemoGroup(name))));
-    return names;
-  }, [existingGroups]);
+    const byId = groups.filter((group) => !isStaleDemoGroup(group.name));
+    const fallback = existingGroups
+      .filter((name) => Boolean(name) && !isStaleDemoGroup(name))
+      .map((name) => ({ id: `label:${name}`, name } as GiftGroup));
+    const starterGroups = ["Family", "Friends"].map((name) => ({ id: `label:${name}`, name } as GiftGroup));
+    return byId.length ? byId : fallback.length ? fallback : starterGroups;
+  }, [existingGroups, groups]);
 
   useEffect(() => {
     if (open) setMode(initialMode);
   }, [initialMode, open]);
+
+  useEffect(() => {
+    if (!open || selectedGroupId || !groupOptions.length) return;
+    setSelectedGroupId(groupOptions[0].id);
+  }, [groupOptions, open, selectedGroupId]);
 
   if (!open) return null;
 
@@ -71,7 +80,9 @@ export function InviteModal({ open, title = "Invite Friends & Family", profileUr
 
   async function saveInvite() {
     setMessage("");
-    const groupName = mode === "new" ? newGroup.trim() : selectedGroup;
+    const selectedGroup = groupOptions.find((group) => group.id === selectedGroupId);
+    let groupName = mode === "new" ? newGroup.trim() : selectedGroup?.name ?? "Family";
+    let groupId = mode === "new" ? undefined : selectedGroup?.id.startsWith("label:") ? undefined : selectedGroup?.id;
     if (mode === "new" && !groupName) {
       setMessage("Name the group first.");
       return;
@@ -83,13 +94,19 @@ export function InviteModal({ open, title = "Invite Friends & Family", profileUr
 
     setSaving(true);
     try {
+      if (mode === "new" && onCreateGroup) {
+        const createdGroup = await onCreateGroup(groupName);
+        groupName = createdGroup.name;
+        groupId = createdGroup.id;
+      }
       await onInvite({
         emailOrPhone: emailOrPhone.trim(),
+        groupId,
         ...connectionGroupFor(groupName)
       });
       setEmailOrPhone("");
       setNewGroup("");
-      setSelectedGroup(groupName);
+      if (groupId) setSelectedGroupId(groupId);
       setMode("existing");
       setMessage("Invite saved as a pending connection.");
     } catch (error) {
@@ -116,7 +133,10 @@ export function InviteModal({ open, title = "Invite Friends & Family", profileUr
         </div>
 
         <div className="mt-4 grid gap-3">
-          <div className="grid gap-2 rounded-3xl bg-cloud p-3">
+          <div className="grid gap-3 rounded-3xl bg-cloud p-3">
+            <div className="grid place-items-center">
+              <QrCard url={profileUrl} />
+            </div>
             <Field label="Invite link">
               <Input readOnly value={profileUrl} />
             </Field>
@@ -152,10 +172,10 @@ export function InviteModal({ open, title = "Invite Friends & Family", profileUr
             </div>
             {mode === "existing" ? (
               <Field label="Group">
-                <Select value={selectedGroup} onChange={(event) => setSelectedGroup(event.target.value)}>
+                <Select value={selectedGroupId} onChange={(event) => setSelectedGroupId(event.target.value)}>
                   {groupOptions.map((group) => (
-                    <option key={group} value={group}>
-                      {group}
+                    <option key={group.id} value={group.id}>
+                      {group.name}
                     </option>
                   ))}
                 </Select>
@@ -172,14 +192,6 @@ export function InviteModal({ open, title = "Invite Friends & Family", profileUr
               <UsersRound size={16} />
               {saving ? "Saving..." : "Save pending invite"}
             </Button>
-          </div>
-
-          <div className="grid gap-2 rounded-3xl bg-cloud p-3">
-            <div className="flex items-center gap-2">
-              <QrCode size={16} className="text-berry" />
-              <h3 className="font-black">QR code</h3>
-            </div>
-            <QrCard url={profileUrl} />
           </div>
 
           {message ? <p className="rounded-2xl bg-mint p-3 text-sm font-bold text-spruce">{message}</p> : null}

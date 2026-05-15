@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { Connection, GiftEvent, GiftEventType, GiftItem, GroupLabel, Profile, Reservation, User } from "./types";
+import type { Connection, ConnectionSource, GiftEvent, GiftEventType, GiftGroup, GiftGroupMember, GiftItem, GroupLabel, Profile, Reservation, User, WishlistShare } from "./types";
 
 type GiftlyStore = {
   user?: User;
@@ -9,6 +9,8 @@ type GiftlyStore = {
   gifts: GiftItem[];
   reservations: Reservation[];
   connections?: Connection[];
+  groups?: GiftGroup[];
+  wishlistShares?: WishlistShare[];
   events?: GiftEvent[];
 };
 
@@ -117,7 +119,7 @@ export function useGiftlyStore() {
           return created;
         });
       },
-      async createConnection(input: { emailOrPhone?: string; groupLabel?: GroupLabel; customGroupLabel?: string }) {
+      async createConnection(input: { emailOrPhone?: string; groupLabel?: GroupLabel; customGroupLabel?: string; groupId?: string; source?: ConnectionSource }) {
         return runAction(async () => {
           const created = await requestJson<Connection>("/api/connections", {
             method: "POST",
@@ -125,6 +127,41 @@ export function useGiftlyStore() {
           });
           setStore((current) => ({ ...current, connections: [created, ...(current.connections ?? [])] }));
           return created;
+        });
+      },
+      async createGroup(input: { name: string }) {
+        return runAction(async () => {
+          const created = await requestJson<GiftGroup>("/api/groups", {
+            method: "POST",
+            body: JSON.stringify(input)
+          });
+          setStore((current) => ({ ...current, groups: [...(current.groups ?? []), created] }));
+          return created;
+        });
+      },
+      async addGroupMember(groupId: string, input: { connectionId?: string; pendingEmailOrPhone?: string }) {
+        return runAction(async () => {
+          const member = await requestJson<GiftGroupMember>(`/api/groups/${groupId}/members`, {
+            method: "POST",
+            body: JSON.stringify(input)
+          });
+          setStore((current) => ({
+            ...current,
+            groups: (current.groups ?? []).map((group) =>
+              group.id === groupId ? { ...group, members: [member, ...group.members.filter((item) => item.id !== member.id)] } : group
+            )
+          }));
+          return member;
+        });
+      },
+      async shareWishlist(input: { profileId: string; connectionId?: string; groupId?: string }) {
+        return runAction(async () => {
+          const share = await requestJson<WishlistShare>("/api/wishlist-shares", {
+            method: "POST",
+            body: JSON.stringify(input)
+          });
+          setStore((current) => ({ ...current, wishlistShares: [share, ...(current.wishlistShares ?? []).filter((item) => item.id !== share.id)] }));
+          return share;
         });
       },
       async updateVanityUrl(profileId: string, slug: string) {
@@ -192,6 +229,7 @@ export function useGiftlyStore() {
               profiles: current.profiles.filter((profile) => profile.id !== id),
               gifts: current.gifts.filter((gift) => gift.profileId !== id),
               reservations: current.reservations.filter((reservation) => !deletedGiftIds.has(reservation.giftItemId)),
+              wishlistShares: (current.wishlistShares ?? []).filter((share) => share.profileId !== id),
               events: (current.events ?? []).filter((event) => event.profileId !== id)
             };
           });

@@ -11,7 +11,8 @@ async function readAuthBody(request: Request) {
   const formData = await request.formData();
   return {
     email: String(formData.get("email") ?? ""),
-    password: String(formData.get("password") ?? "")
+    password: String(formData.get("password") ?? ""),
+    next: String(formData.get("next") ?? "")
   };
 }
 
@@ -30,6 +31,12 @@ function redirectWithSessionCookie(url: URL, cookie: string) {
   });
 }
 
+function safeNextPath(value: unknown) {
+  if (typeof value !== "string") return "";
+  if (!value.startsWith("/") || value.startsWith("//")) return "";
+  return value;
+}
+
 export async function POST(request: Request) {
   try {
     const body = await readAuthBody(request);
@@ -37,7 +44,7 @@ export async function POST(request: Request) {
     const cookie = serializeSessionCookie(session);
     const response = wantsJson(request)
       ? NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store", "Set-Cookie": cookie } })
-      : redirectWithSessionCookie(new URL(user.onboardingCompleted ? "/dashboard" : "/onboarding", request.url), cookie);
+      : redirectWithSessionCookie(new URL(safeNextPath(body.next) || (user.onboardingCompleted ? "/dashboard" : "/onboarding"), request.url), cookie);
     console.info("[auth-debug] Setting session cookie", {
       route: "login",
       runtime: process.env.NEXT_RUNTIME ?? "nodejs",

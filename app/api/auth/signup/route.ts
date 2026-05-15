@@ -13,7 +13,8 @@ async function readAuthBody(request: Request) {
   return {
     name: String(formData.get("name") ?? ""),
     email: String(formData.get("email") ?? ""),
-    password: String(formData.get("password") ?? "")
+    password: String(formData.get("password") ?? ""),
+    next: String(formData.get("next") ?? "")
   };
 }
 
@@ -30,6 +31,12 @@ function redirectWithSessionCookie(url: URL, cookie: string) {
       "Cache-Control": "no-store"
     }
   });
+}
+
+function safeNextPath(value: unknown) {
+  if (typeof value !== "string") return "";
+  if (!value.startsWith("/") || value.startsWith("//")) return "";
+  return value;
 }
 
 function logSignupFailure(error: unknown) {
@@ -61,7 +68,7 @@ export async function POST(request: Request) {
     const cookie = serializeSessionCookie(session);
     const response = wantsJson(request)
       ? NextResponse.json({ ok: true }, { status: 201, headers: { "Cache-Control": "no-store", "Set-Cookie": cookie } })
-      : redirectWithSessionCookie(new URL("/onboarding", request.url), cookie);
+      : redirectWithSessionCookie(new URL(safeNextPath(body.next) || "/onboarding", request.url), cookie);
     console.info("[auth-debug] Setting session cookie", {
       route: "signup",
       runtime: process.env.NEXT_RUNTIME ?? "nodejs",

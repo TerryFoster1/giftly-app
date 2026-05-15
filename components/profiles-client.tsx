@@ -6,19 +6,24 @@ import { useState } from "react";
 import { useGiftlyStore } from "@/lib/store";
 import { formatEventDate } from "@/lib/events";
 import type { GroupLabel } from "@/lib/types";
-import { publicProfilePath, publicProfileUrl } from "@/lib/url";
+import { bubbleInviteUrl, publicProfilePath, publicProfileUrl } from "@/lib/url";
 import { Avatar } from "./avatar";
 import { Button, Field, Input, Select, Textarea } from "./ui";
 import { QrCard } from "./qr-card";
 import { InviteModal } from "./invite-modal";
 
 export function ProfilesClient() {
-  const { user, profiles, connections = [], actionError, actions, ready } = useGiftlyStore();
+  const { user, profiles, connections = [], groups = [], wishlistShares = [], actionError, actions, ready } = useGiftlyStore();
   const [showForm, setShowForm] = useState(false);
   const [shareSlug, setShareSlug] = useState("");
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const [vanityDrafts, setVanityDrafts] = useState<Record<string, string>>({});
   const [eventDrafts, setEventDrafts] = useState<Record<string, { birthday: string; anniversary: string }>>({});
+  const [newGroupName, setNewGroupName] = useState("");
+  const [groupInviteDrafts, setGroupInviteDrafts] = useState<Record<string, string>>({});
+  const [groupMemberDrafts, setGroupMemberDrafts] = useState<Record<string, string>>({});
+  const [shareGroupDrafts, setShareGroupDrafts] = useState<Record<string, string>>({});
+  const [shareConnectionDrafts, setShareConnectionDrafts] = useState<Record<string, string>>({});
   const [vanityMessage, setVanityMessage] = useState("");
   const [eventMessage, setEventMessage] = useState("");
   const [form, setForm] = useState({
@@ -109,26 +114,68 @@ export function ProfilesClient() {
     }
   }
 
-  async function saveInvite(input: { emailOrPhone?: string; groupLabel: GroupLabel; customGroupLabel?: string }) {
-    await actions.createConnection(input);
+  async function saveInvite(input: { emailOrPhone?: string; groupLabel: GroupLabel; customGroupLabel?: string; groupId?: string }) {
+    await actions.createConnection({ ...input, source: "INVITE_LINK" });
+    await actions.refresh();
+  }
+
+  async function createShareGroup(name: string) {
+    const group = await actions.createGroup({ name });
+    await actions.refresh();
+    return group;
+  }
+
+  async function createGiftGroup() {
+    if (!newGroupName.trim()) return;
+    await actions.createGroup({ name: newGroupName.trim() });
+    setNewGroupName("");
+    await actions.refresh();
+  }
+
+  async function inviteToGroup(groupId: string) {
+    const value = groupInviteDrafts[groupId]?.trim();
+    if (!value) return;
+    await actions.createConnection({ emailOrPhone: value, groupId, source: "EMAIL", groupLabel: "CUSTOM", customGroupLabel: groups.find((group) => group.id === groupId)?.name });
+    setGroupInviteDrafts((current) => ({ ...current, [groupId]: "" }));
+    await actions.refresh();
+  }
+
+  async function addBubblePersonToGroup(groupId: string) {
+    const connectionId = groupMemberDrafts[groupId];
+    if (!connectionId) return;
+    await actions.addGroupMember(groupId, { connectionId });
+    setGroupMemberDrafts((current) => ({ ...current, [groupId]: "" }));
+    await actions.refresh();
+  }
+
+  async function shareWithGroup(profileId: string) {
+    const groupId = shareGroupDrafts[profileId];
+    if (!groupId) return;
+    await actions.shareWishlist({ profileId, groupId });
+    await actions.refresh();
+  }
+
+  async function shareWithConnection(profileId: string) {
+    const connectionId = shareConnectionDrafts[profileId];
+    if (!connectionId) return;
+    await actions.shareWishlist({ profileId, connectionId });
     await actions.refresh();
   }
 
   const groupOptions: GroupLabel[] = ["FAMILY", "FRIENDS", "PARTNER", "GUESTS", "CUSTOM"];
-  const existingGroupNames = Array.from(
-    new Set(
-      connections
-        .map((connection) =>
-          connection.customGroupLabel ||
-          connection.groupLabel
-            .toLowerCase()
-            .split("_")
-            .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-            .join(" ")
-        )
-        .filter(Boolean)
-    )
-  );
+  const existingGroupNames = groups.map((group) => group.name);
+  const bubbleConnections = connections.filter((connection) => connection.status === "ACCEPTED" || connection.emailOrPhone || connection.targetUserId);
+  const currentShareProfile = profiles.find((profile) => profile.slug === shareSlug);
+
+  function connectionLabel(connection: (typeof connections)[number]) {
+    if (connection.emailOrPhone) return connection.emailOrPhone;
+    if (connection.targetUserId) return "Connected Giftly user";
+    return "Managed gift account";
+  }
+
+  function shareCountForProfile(profileId: string) {
+    return wishlistShares.filter((share) => share.profileId === profileId).length;
+  }
 
   return (
     <main className="mx-auto grid max-w-6xl gap-6 px-4 py-6 lg:grid-cols-[1fr_22rem]">
@@ -266,12 +313,71 @@ export function ProfilesClient() {
             <div className="mt-3 grid gap-2">
               {connections.map((connection) => (
                 <div className="rounded-2xl bg-cloud p-3 text-sm font-bold text-ink/65" key={connection.id}>
-                  {connection.emailOrPhone ?? "Managed gift account"} · {connection.status} · {connection.groupLabel}
+                  {connectionLabel(connection)} · {connection.status.toLowerCase()} · {connection.source.toLowerCase().replace("_", " ")}
                 </div>
               ))}
             </div>
           </div>
         ) : null}
+        <section className="grid gap-4 rounded-[2rem] border border-ink/10 bg-white p-4 shadow-sm">
+          <div>
+            <p className="text-sm font-black uppercase text-berry">Bubble</p>
+            <h2 className="text-xl font-black">People connected to you</h2>
+            <p className="mt-1 text-sm font-semibold leading-6 text-ink/60">
+              Your Bubble is your connected people. They do not automatically see wishlists until you share a wishlist with a person or group.
+            </p>
+          </div>
+          {bubbleConnections.length ? (
+            <div className="grid gap-2 sm:grid-cols-2">
+              {bubbleConnections.map((connection) => (
+                <div className="rounded-2xl bg-cloud p-3 text-sm font-bold text-ink/65" key={connection.id}>
+                  <span className="block text-ink">{connectionLabel(connection)}</span>
+                  <span className="text-xs uppercase text-ink/45">{connection.status.toLowerCase()} connection</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="rounded-2xl bg-cloud p-3 text-sm font-bold text-ink/55">
+              Share your Giftly link or invite someone by email/mobile to start building your Bubble.
+            </p>
+          )}
+        </section>
+        <section className="grid gap-4 rounded-[2rem] border border-ink/10 bg-white p-4 shadow-sm">
+          <div>
+            <p className="text-sm font-black uppercase text-berry">Groups</p>
+            <h2 className="text-xl font-black">Family, friends, and smaller circles</h2>
+            <p className="mt-1 text-sm font-semibold leading-6 text-ink/60">
+              Groups are subsets of your Bubble. Use them later for wishlist access, event visibility, and surprise-safe planning.
+            </p>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+            <Input value={newGroupName} onChange={(event) => setNewGroupName(event.target.value)} placeholder="Create a group, like Neighbors or Book Club" />
+            <Button type="button" variant="secondary" onClick={createGiftGroup}>Add Group</Button>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            {groups.map((group) => (
+              <article className="grid gap-3 rounded-3xl bg-cloud p-3" key={group.id}>
+                <div>
+                  <h3 className="text-lg font-black">{group.name}</h3>
+                  <p className="text-xs font-bold uppercase text-ink/45">{group.members.length} members or pending invites</p>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                  <Select value={groupMemberDrafts[group.id] ?? ""} onChange={(event) => setGroupMemberDrafts({ ...groupMemberDrafts, [group.id]: event.target.value })}>
+                    <option value="">Add Bubble person</option>
+                    {bubbleConnections.map((connection) => (
+                      <option key={connection.id} value={connection.id}>{connectionLabel(connection)}</option>
+                    ))}
+                  </Select>
+                  <Button type="button" variant="ghost" onClick={() => addBubblePersonToGroup(group.id)}>Add</Button>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                  <Input value={groupInviteDrafts[group.id] ?? ""} onChange={(event) => setGroupInviteDrafts({ ...groupInviteDrafts, [group.id]: event.target.value })} placeholder="Invite by email or mobile" />
+                  <Button type="button" variant="ghost" onClick={() => inviteToGroup(group.id)}>Invite</Button>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
         <div className="grid gap-4 md:grid-cols-2">
           {profiles.map((profile) => (
             <article className="rounded-[2rem] border border-ink/10 bg-white p-4 shadow-sm" key={profile.id}>
@@ -344,6 +450,33 @@ export function ProfilesClient() {
                   This is a managed gift account. If this person joins Giftly later, they can connect to it and ownership can be transferred after a safe claim flow.
                 </p>
               ) : null}
+              <div className="mt-4 grid gap-3 rounded-2xl bg-cloud p-3">
+                <div>
+                  <h3 className="text-sm font-black">Share this wishlist</h3>
+                  <p className="mt-1 text-xs font-bold leading-5 text-ink/55">
+                    Private until shared. Phase 1 grants wishlist-level access to Bubble people or groups. Item-level sharing and exclusions come later.
+                  </p>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                  <Select value={shareGroupDrafts[profile.id] ?? ""} onChange={(event) => setShareGroupDrafts({ ...shareGroupDrafts, [profile.id]: event.target.value })}>
+                    <option value="">Share with group</option>
+                    {groups.map((group) => (
+                      <option key={group.id} value={group.id}>{group.name}</option>
+                    ))}
+                  </Select>
+                  <Button type="button" variant="ghost" onClick={() => shareWithGroup(profile.id)}>Share</Button>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                  <Select value={shareConnectionDrafts[profile.id] ?? ""} onChange={(event) => setShareConnectionDrafts({ ...shareConnectionDrafts, [profile.id]: event.target.value })}>
+                    <option value="">Share with person</option>
+                    {bubbleConnections.map((connection) => (
+                      <option key={connection.id} value={connection.id}>{connectionLabel(connection)}</option>
+                    ))}
+                  </Select>
+                  <Button type="button" variant="ghost" onClick={() => shareWithConnection(profile.id)}>Share</Button>
+                </div>
+                <p className="text-xs font-bold text-spruce">{shareCountForProfile(profile.id)} active share grants</p>
+              </div>
               <div className="mt-4 grid gap-2 sm:grid-cols-4">
                 <Link className="focus-ring inline-flex min-h-11 items-center justify-center rounded-2xl bg-coral px-3 text-sm font-black text-white hover:bg-berry" href={`/profiles/${profile.slug}`}>
                   Gifts
@@ -379,8 +512,10 @@ export function ProfilesClient() {
       <InviteModal
         open={Boolean(shareSlug)}
         title="Share this wishlist"
-        profileUrl={shareSlug ? publicProfileUrl(shareSlug) : ""}
+        profileUrl={user && currentShareProfile ? bubbleInviteUrl(user.id, { wishlistId: currentShareProfile.id }) : ""}
         existingGroups={existingGroupNames}
+        groups={groups}
+        onCreateGroup={createShareGroup}
         onClose={() => setShareSlug("")}
         onInvite={saveInvite}
       />

@@ -7,7 +7,7 @@ import { useGiftlyStore } from "@/lib/store";
 import { getUpcomingProfileEvents } from "@/lib/events";
 import { type GiftItem, type GroupLabel, type Profile, type RecommendedProduct } from "@/lib/types";
 import { normalizeProductUrl } from "@/lib/product-url";
-import { publicProfileUrl } from "@/lib/url";
+import { bubbleInviteUrl } from "@/lib/url";
 import { InviteModal } from "./invite-modal";
 import { OnboardingCard } from "./onboarding-card";
 import { Button, Field, Input, Select } from "./ui";
@@ -73,7 +73,7 @@ function isDemoGroupName(value: string) {
 }
 
 export function DashboardClient() {
-  const { user, profiles, gifts, connections = [], events = [], ready, actionError, actions } = useGiftlyStore();
+  const { user, profiles, gifts, connections = [], groups = [], events = [], ready, actionError, actions } = useGiftlyStore();
   const [giftMessage, setGiftMessage] = useState("");
   const [fastUrl, setFastUrl] = useState("");
   const [fastError, setFastError] = useState("");
@@ -230,9 +230,15 @@ export function DashboardClient() {
     }
   }
 
-  async function saveInvite(input: { emailOrPhone?: string; groupLabel: GroupLabel; customGroupLabel?: string }) {
-    await actions.createConnection(input);
+  async function saveInvite(input: { emailOrPhone?: string; groupLabel: GroupLabel; customGroupLabel?: string; groupId?: string }) {
+    await actions.createConnection({ ...input, source: "INVITE_LINK" });
     await actions.refresh();
+  }
+
+  async function createShareGroup(name: string) {
+    const group = await actions.createGroup({ name });
+    await actions.refresh();
+    return group;
   }
 
   function openShareModal(mode: "existing" | "new" = "existing") {
@@ -610,10 +616,12 @@ export function DashboardClient() {
       <InviteModal
         open={shareOpen && Boolean(primaryProfile)}
         title="Share your Giftly link"
-        profileUrl={primaryProfile ? publicProfileUrl(primaryProfile.slug) : ""}
+        profileUrl={user ? bubbleInviteUrl(user.id) : ""}
         existingGroups={existingGroupNames}
+        groups={groups}
         initialMode={shareInitialMode}
         onClose={() => setShareOpen(false)}
+        onCreateGroup={createShareGroup}
         onInvite={saveInvite}
       />
     </main>

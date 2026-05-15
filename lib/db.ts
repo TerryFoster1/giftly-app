@@ -1,15 +1,18 @@
-import { EventTag as DbEventTag, GiftEventType as DbGiftEventType, GroupLabel as DbGroupLabel, Prisma } from "@prisma/client";
+import { ConnectionSource as DbConnectionSource, ConnectionStatus as DbConnectionStatus, EventTag as DbEventTag, GiftEventType as DbGiftEventType, GroupLabel as DbGroupLabel, Prisma } from "@prisma/client";
 import { randomUUID } from "crypto";
 import { createAmazonAffiliateUrl, shouldPreserveManualAffiliateUrl } from "./affiliate";
 import { userHasAdminAccess } from "./auth";
 import { isAmazonUrl, normalizeAmazonProductUrl } from "./product-url";
 import { prisma } from "./prisma";
-import type { AdminOverview, AffiliateProgram, Connection, EventTag, GiftEvent, GiftEventType, GiftItem, GroupLabel, Profile, RecommendedProduct, Reservation, User } from "./types";
+import type { AdminOverview, AffiliateProgram, Connection, ConnectionSource, ConnectionStatus, EventTag, GiftEvent, GiftEventType, GiftGroup, GiftGroupMember, GiftItem, GroupLabel, Profile, RecommendedProduct, Reservation, User, WishlistShare } from "./types";
 
 type DbGift = Awaited<ReturnType<typeof prisma.giftItem.findFirst>>;
 type DbProfile = Awaited<ReturnType<typeof prisma.profile.findFirst>>;
 type DbReservation = Awaited<ReturnType<typeof prisma.reservation.findFirst>>;
 type DbConnection = Awaited<ReturnType<typeof prisma.connection.findFirst>>;
+type DbGiftGroup = NonNullable<Awaited<ReturnType<typeof prisma.giftGroup.findFirst>>> & { members?: NonNullable<Awaited<ReturnType<typeof prisma.giftGroupMember.findFirst>>>[] };
+type DbGiftGroupMember = Awaited<ReturnType<typeof prisma.giftGroupMember.findFirst>>;
+type DbWishlistShare = Awaited<ReturnType<typeof prisma.wishlistShare.findFirst>>;
 type DbGiftEvent = Awaited<ReturnType<typeof prisma.giftEvent.findFirst>>;
 type DbRecommendedProduct = Awaited<ReturnType<typeof prisma.recommendedProduct.findFirst>>;
 type DbAffiliateProgram = Awaited<ReturnType<typeof prisma.affiliateProgram.findFirst>>;
@@ -99,10 +102,48 @@ export function toConnection(connection: NonNullable<DbConnection>): Connection 
     managedProfileId: connection.managedProfileId ?? undefined,
     emailOrPhone: connection.emailOrPhone ?? undefined,
     status: connection.status as Connection["status"],
+    source: connection.source as ConnectionSource,
     groupLabel: connection.groupLabel as GroupLabel,
     customGroupLabel: connection.customGroupLabel ?? undefined,
     createdAt: dateString(connection.createdAt),
     updatedAt: dateString(connection.updatedAt)
+  };
+}
+
+export function toGiftGroupMember(member: NonNullable<DbGiftGroupMember>): GiftGroupMember {
+  return {
+    id: member.id,
+    groupId: member.groupId,
+    connectionId: member.connectionId ?? undefined,
+    connectedUserId: member.connectedUserId ?? undefined,
+    pendingEmailOrPhone: member.pendingEmailOrPhone ?? undefined,
+    status: member.status as GiftGroupMember["status"],
+    createdAt: dateString(member.createdAt),
+    updatedAt: dateString(member.updatedAt)
+  };
+}
+
+export function toGiftGroup(group: DbGiftGroup): GiftGroup {
+  return {
+    id: group.id,
+    ownerUserId: group.ownerUserId,
+    name: group.name,
+    members: (group.members ?? []).map(toGiftGroupMember),
+    createdAt: dateString(group.createdAt),
+    updatedAt: dateString(group.updatedAt)
+  };
+}
+
+export function toWishlistShare(share: NonNullable<DbWishlistShare>): WishlistShare {
+  return {
+    id: share.id,
+    ownerUserId: share.ownerUserId,
+    profileId: share.profileId,
+    connectionId: share.connectionId ?? undefined,
+    groupId: share.groupId ?? undefined,
+    accessLevel: share.accessLevel,
+    createdAt: dateString(share.createdAt),
+    updatedAt: dateString(share.updatedAt)
   };
 }
 
@@ -334,8 +375,29 @@ export async function ownsGift(userId: string, giftId: string) {
   return count === 1;
 }
 
+async function ensureDefaultGiftGroups(userId: string) {
+  const stamp = new Date();
+  await Promise.all(
+    ["Family", "Friends"].map((name) =>
+      prisma.giftGroup.upsert({
+        where: { ownerUserId_name: { ownerUserId: userId, name } },
+        create: {
+          id: `group_${randomUUID()}`,
+          ownerUserId: userId,
+          name,
+          createdAt: stamp,
+          updatedAt: stamp
+        },
+        update: {}
+      })
+    )
+  );
+}
+
 export async function getOwnerStore(user: User) {
-  const [profiles, gifts, reservations, connections, events] = await Promise.all([
+  await ensureDefaultGiftGroups(user.id);
+
+  const [profiles, gifts, reservations, connections, events, groups, wishlistShares] = await Promise.all([
     prisma.profile.findMany({ where: { ownerUserId: user.id }, orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }] }),
     prisma.giftItem.findMany({
       where: { profile: { ownerUserId: user.id } },
@@ -354,6 +416,15 @@ export async function getOwnerStore(user: User) {
     prisma.giftEvent.findMany({
       where: { ownerUserId: user.id },
       orderBy: [{ eventDate: "asc" }, { createdAt: "desc" }]
+    }),
+    prisma.giftGroup.findMany({
+      where: { ownerUserId: user.id },
+      include: { members: true },
+      orderBy: [{ name: "asc" }]
+    }),
+    prisma.wishlistShare.findMany({
+      where: { ownerUserId: user.id },
+      orderBy: { createdAt: "desc" }
     })
   ]);
 
@@ -363,7 +434,9 @@ export async function getOwnerStore(user: User) {
     gifts: gifts.map(toGift),
     reservations: reservations.map(toReservation),
     connections: connections.map(toConnection),
-    events: events.map(toGiftEvent)
+    events: events.map(toGiftEvent),
+    groups: groups.map(toGiftGroup),
+    wishlistShares: wishlistShares.map(toWishlistShare)
   };
 }
 
@@ -462,7 +535,7 @@ export const createProfile = createManagedProfile;
 
 export async function createPendingConnection(
   user: User,
-  input: { emailOrPhone?: string; groupLabel?: GroupLabel; customGroupLabel?: string }
+  input: { emailOrPhone?: string; groupLabel?: GroupLabel; customGroupLabel?: string; groupId?: string; source?: ConnectionSource }
 ) {
   const stamp = new Date();
   const targetUser = input.emailOrPhone?.includes("@")
@@ -475,13 +548,227 @@ export async function createPendingConnection(
       requesterUserId: user.id,
       targetUserId: targetUser?.id ?? null,
       emailOrPhone: input.emailOrPhone?.trim() || null,
-      status: "PENDING",
+      status: targetUser ? "ACCEPTED" : "PENDING",
+      source: (input.source ?? "MANUAL") as DbConnectionSource,
       groupLabel: (input.groupLabel ?? "FAMILY") as DbGroupLabel,
       customGroupLabel: input.customGroupLabel || null,
       createdAt: stamp,
       updatedAt: stamp
     }
   });
+
+  if (input.groupId) {
+    await addConnectionToGroup(user, {
+      groupId: input.groupId,
+      connectionId: connection.id,
+      pendingEmailOrPhone: input.emailOrPhone,
+      status: targetUser ? "ACCEPTED" : "PENDING"
+    });
+  }
+
+  return toConnection(connection);
+}
+
+export async function createGiftGroup(user: User, input: { name: string }) {
+  const name = input.name.trim();
+  if (!name) throw new Error("INVALID_GROUP");
+  const stamp = new Date();
+  const group = await prisma.giftGroup.upsert({
+    where: { ownerUserId_name: { ownerUserId: user.id, name } },
+    create: {
+      id: `group_${randomUUID()}`,
+      ownerUserId: user.id,
+      name,
+      createdAt: stamp,
+      updatedAt: stamp
+    },
+    update: { updatedAt: stamp },
+    include: { members: true }
+  });
+  return toGiftGroup(group);
+}
+
+export async function addConnectionToGroup(
+  user: User,
+  input: { groupId: string; connectionId?: string; pendingEmailOrPhone?: string; status?: ConnectionStatus }
+) {
+  const group = await prisma.giftGroup.findFirst({ where: { id: input.groupId, ownerUserId: user.id } });
+  if (!group) throw new Error("FORBIDDEN");
+  if (!input.connectionId && !input.pendingEmailOrPhone?.trim()) throw new Error("INVALID_GROUP_MEMBER");
+
+  let connection: NonNullable<DbConnection> | null = null;
+  if (input.connectionId) {
+    connection = await prisma.connection.findFirst({
+      where: {
+        id: input.connectionId,
+        requesterUserId: user.id
+      }
+    });
+    if (!connection) throw new Error("FORBIDDEN");
+  }
+
+  const memberIdentityFilters = [
+    input.connectionId ? { connectionId: input.connectionId } : undefined,
+    input.pendingEmailOrPhone ? { pendingEmailOrPhone: input.pendingEmailOrPhone.trim() } : undefined
+  ].filter(Boolean) as Prisma.GiftGroupMemberWhereInput[];
+
+  const existing = await prisma.giftGroupMember.findFirst({
+    where: {
+      groupId: input.groupId,
+      OR: memberIdentityFilters
+    }
+  });
+  if (existing) return toGiftGroupMember(existing);
+
+  const stamp = new Date();
+  const member = await prisma.giftGroupMember.create({
+    data: {
+      id: `member_${randomUUID()}`,
+      groupId: input.groupId,
+      connectionId: connection?.id ?? null,
+      connectedUserId: connection?.targetUserId ?? null,
+      pendingEmailOrPhone: input.pendingEmailOrPhone?.trim() || connection?.emailOrPhone || null,
+      status: (input.status ?? connection?.status ?? "PENDING") as DbConnectionStatus,
+      createdAt: stamp,
+      updatedAt: stamp
+    }
+  });
+  return toGiftGroupMember(member);
+}
+
+export async function shareWishlist(user: User, input: { profileId: string; connectionId?: string; groupId?: string }) {
+  if (!(await ownsProfile(user.id, input.profileId))) throw new Error("FORBIDDEN");
+  if (!input.connectionId && !input.groupId) throw new Error("INVALID_SHARE_TARGET");
+
+  if (input.connectionId) {
+    const ownsConnection = await prisma.connection.count({ where: { id: input.connectionId, requesterUserId: user.id } });
+    if (!ownsConnection) throw new Error("FORBIDDEN");
+  }
+  if (input.groupId) {
+    const ownsGroup = await prisma.giftGroup.count({ where: { id: input.groupId, ownerUserId: user.id } });
+    if (!ownsGroup) throw new Error("FORBIDDEN");
+  }
+
+  const existing = await prisma.wishlistShare.findFirst({
+    where: {
+      ownerUserId: user.id,
+      profileId: input.profileId,
+      connectionId: input.connectionId || null,
+      groupId: input.groupId || null
+    }
+  });
+  if (existing) return toWishlistShare(existing);
+
+  const stamp = new Date();
+  const share = await prisma.wishlistShare.create({
+    data: {
+      id: `share_${randomUUID()}`,
+      ownerUserId: user.id,
+      profileId: input.profileId,
+      connectionId: input.connectionId || null,
+      groupId: input.groupId || null,
+      accessLevel: "view",
+      createdAt: stamp,
+      updatedAt: stamp
+    }
+  });
+  return toWishlistShare(share);
+}
+
+export async function acceptBubbleInvite(
+  user: User,
+  input: { ownerUserId: string; groupId?: string; wishlistId?: string }
+) {
+  if (!input.ownerUserId || input.ownerUserId === user.id) return null;
+
+  const owner = await prisma.user.findUnique({ where: { id: input.ownerUserId } });
+  if (!owner) throw new Error("INVITE_NOT_FOUND");
+
+  const stamp = new Date();
+  let connection = await prisma.connection.findFirst({
+    where: {
+      requesterUserId: input.ownerUserId,
+      targetUserId: user.id
+    }
+  });
+
+  if (!connection) {
+    connection = await prisma.connection.create({
+      data: {
+        id: `connection_${randomUUID()}`,
+        requesterUserId: input.ownerUserId,
+        targetUserId: user.id,
+        emailOrPhone: user.email,
+        status: "ACCEPTED",
+        source: "INVITE_LINK",
+        groupLabel: "FRIENDS",
+        createdAt: stamp,
+        updatedAt: stamp
+      }
+    });
+  } else if (connection.status !== "ACCEPTED") {
+    connection = await prisma.connection.update({
+      where: { id: connection.id },
+      data: {
+        status: "ACCEPTED",
+        targetUserId: user.id,
+        updatedAt: stamp
+      }
+    });
+  }
+
+  if (input.groupId) {
+    const group = await prisma.giftGroup.findFirst({
+      where: { id: input.groupId, ownerUserId: input.ownerUserId }
+    });
+    if (group) {
+      const existingMember = await prisma.giftGroupMember.findFirst({
+        where: { groupId: group.id, connectionId: connection.id }
+      });
+      if (!existingMember) {
+        await prisma.giftGroupMember.create({
+          data: {
+            id: `member_${randomUUID()}`,
+            groupId: group.id,
+            connectionId: connection.id,
+            connectedUserId: user.id,
+            pendingEmailOrPhone: user.email,
+            status: "ACCEPTED",
+            createdAt: stamp,
+            updatedAt: stamp
+          }
+        });
+      }
+    }
+  }
+
+  if (input.wishlistId) {
+    const wishlist = await prisma.profile.findFirst({
+      where: { id: input.wishlistId, ownerUserId: input.ownerUserId }
+    });
+    if (wishlist) {
+      const existingShare = await prisma.wishlistShare.findFirst({
+        where: {
+          ownerUserId: input.ownerUserId,
+          profileId: wishlist.id,
+          connectionId: connection.id
+        }
+      });
+      if (!existingShare) {
+        await prisma.wishlistShare.create({
+          data: {
+            id: `share_${randomUUID()}`,
+            ownerUserId: input.ownerUserId,
+            profileId: wishlist.id,
+            connectionId: connection.id,
+            accessLevel: "view",
+            createdAt: stamp,
+            updatedAt: stamp
+          }
+        });
+      }
+    }
+  }
 
   return toConnection(connection);
 }
@@ -620,6 +907,15 @@ export async function resetUserGiftlyData(user: User) {
   const profileIds = ownedProfiles.map((profile) => profile.id);
 
   await prisma.$transaction([
+    prisma.wishlistShare.deleteMany({
+      where: { ownerUserId: user.id }
+    }),
+    prisma.giftGroupMember.deleteMany({
+      where: { group: { ownerUserId: user.id } }
+    }),
+    prisma.giftGroup.deleteMany({
+      where: { ownerUserId: user.id }
+    }),
     prisma.giftEvent.deleteMany({
       where: { ownerUserId: user.id }
     }),

@@ -10,6 +10,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [nextPath, setNextPath] = useState("");
   const [form, setForm] = useState({ name: "", email: "", password: "", confirmPassword: "" });
 
   const passwordChecks = {
@@ -24,6 +25,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
     const params = new URLSearchParams(window.location.search);
     if (params.get("error") === "invalid") setError("Invalid email or password.");
     if (params.get("error") === "signup") setError("Signup is temporarily unavailable. Please try again soon.");
+    setNextPath(params.get("next") ?? "");
   }, []);
 
   function Requirement({ met, children }: { met: boolean; children: React.ReactNode }) {
@@ -73,6 +75,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
         <p className="text-sm font-black uppercase text-berry">{mode === "login" ? "Welcome back" : "Create account"}</p>
         <h1 className="text-3xl font-black">{mode === "login" ? "Log in to Giftly" : "Start Giftly"}</h1>
       </div>
+      {nextPath ? <input type="hidden" name="next" value={nextPath} /> : null}
       {mode === "signup" ? (
         <Field label="Name">
           <Input name="name" required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
@@ -142,7 +145,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
       <Button type="submit" disabled={loading || (mode === "signup" && !signupPasswordIsValid)}>{loading ? "Please wait..." : mode === "login" ? "Log In" : "Create Account"}</Button>
       <p className="text-center text-sm font-bold text-ink/60">
         {mode === "login" ? "Need an account? " : "Already have an account? "}
-        <Link className="text-spruce underline" href={mode === "login" ? "/signup" : "/login"}>
+        <Link className="text-spruce underline" href={`${mode === "login" ? "/signup" : "/login"}${nextPath ? `?next=${encodeURIComponent(nextPath)}` : ""}`}>
           {mode === "login" ? "Sign up" : "Log in"}
         </Link>
       </p>
