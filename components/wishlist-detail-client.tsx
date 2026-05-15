@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Plus, X } from "lucide-react";
+import { Plus, Share2, Sparkles, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useGiftlyStore } from "@/lib/store";
 import { eventTags, type GiftItem, type Visibility } from "@/lib/types";
@@ -51,6 +51,15 @@ export function WishlistDetailClient({ slug }: { slug: string }) {
   const [fastVisibility, setFastVisibility] = useState<"private" | "shared">("private");
 
   const selectedProfile = useMemo(() => profiles.find((profile) => profile.slug === slug), [profiles, slug]);
+  const wishlistStats = useMemo(() => {
+    if (!selectedProfile) return { total: 0, shared: 0, reserved: 0 };
+    const profileGifts = gifts.filter((gift) => gift.profileId === selectedProfile.id);
+    return {
+      total: profileGifts.length,
+      shared: profileGifts.filter((gift) => gift.visibility !== "private").length,
+      reserved: profileGifts.filter((gift) => gift.reservedStatus === "reserved").length
+    };
+  }, [gifts, selectedProfile]);
   const visibleGifts = useMemo(() => {
     if (!selectedProfile) return [];
     return gifts
@@ -188,32 +197,39 @@ export function WishlistDetailClient({ slug }: { slug: string }) {
   }
 
   return (
-    <main className="mx-auto grid max-w-6xl gap-5 px-4 py-6">
-      <section className="grid gap-4 rounded-[2rem] border border-ink/10 bg-white p-5 shadow-soft">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
+    <main className="mx-auto grid max-w-6xl gap-5 px-4 py-5">
+      <section className="grid gap-4 rounded-[2rem] border border-ink/10 bg-white p-4 shadow-soft sm:p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
             <Link className="text-sm font-black text-spruce underline" href="/dashboard">
               Back to dashboard
             </Link>
-            <p className="mt-4 text-sm font-black uppercase text-berry">Wishlist</p>
-            <h1 className="text-3xl font-black leading-tight sm:text-5xl">{selectedProfile.displayName}</h1>
-            <p className="mt-2 max-w-xl text-sm font-semibold leading-6 text-ink/60">
-              Browse saved gift ideas, compare priorities, and keep this list ready to share when someone asks.
+            <p className="mt-4 text-xs font-black uppercase tracking-[0.12em] text-berry">Curated wishlist</p>
+            <h1 className="mt-1 text-3xl font-black leading-tight sm:text-5xl">{selectedProfile.displayName}</h1>
+            <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-ink/60">
+              {selectedProfile.bio || "A thoughtful board of gift ideas, saved for the moments when someone asks what would feel special."}
             </p>
+            <div className="mt-3 flex flex-wrap gap-2 text-xs font-black text-ink/55">
+              <span className="rounded-full bg-cloud px-3 py-1">{wishlistStats.total} {wishlistStats.total === 1 ? "idea" : "ideas"}</span>
+              <span className="rounded-full bg-blush px-3 py-1 text-berry">{wishlistStats.shared} shareable</span>
+              <span className="rounded-full bg-mint px-3 py-1 text-spruce">{wishlistStats.reserved} planned</span>
+              <span className="rounded-full bg-cloud px-3 py-1">{selectedProfile.isManagedProfile ? "Managed wishlist" : "Personal wishlist"}</span>
+            </div>
           </div>
           <div className="flex flex-col gap-2 sm:items-end">
-            <Link className="text-sm font-black text-spruce underline" href={publicProfilePath(selectedProfile.slug)}>
-              View public profile
+            <Link className="focus-ring inline-flex min-h-10 items-center justify-center gap-2 rounded-2xl border border-ink/10 bg-white px-3 text-sm font-black text-ink hover:bg-blush" href={publicProfilePath(selectedProfile.slug)}>
+              <Share2 size={15} />
+              Public view
             </Link>
-            <Button type="button" onClick={() => { setEditing(null); setShowForm(true); }}>
+            <Button type="button" className="min-h-10" onClick={() => { setEditing(null); setShowForm(true); }}>
               <Plus size={16} />
               Add gift
             </Button>
           </div>
         </div>
-        <div className="grid gap-3 rounded-3xl bg-cloud p-3 sm:grid-cols-[1fr_auto]">
+        <div className="grid gap-3 rounded-3xl bg-cloud p-2.5 sm:grid-cols-[1fr_auto]">
           <Input aria-label="Product link" placeholder="Paste a product link" type="text" value={fastUrl} onChange={(event) => setFastUrl(event.target.value)} />
-          <Button type="button" onClick={openFastAdd}>
+          <Button type="button" className="min-h-10" onClick={openFastAdd}>
             <Plus size={16} />
             Quick add
           </Button>
@@ -225,22 +241,31 @@ export function WishlistDetailClient({ slug }: { slug: string }) {
       {actionError ? <p className="rounded-2xl bg-blush p-3 text-sm font-bold text-berry">{actionError}</p> : null}
 
       <section className="grid gap-4">
-        <div className="grid gap-3 rounded-[1.5rem] border border-ink/10 bg-white p-3 shadow-sm sm:grid-cols-3">
-          <Select value={eventFilter} onChange={(event) => setEventFilter(event.target.value)}>
-            <option>All events</option>
-            {eventTags.map((tag) => <option key={tag}>{tag}</option>)}
-          </Select>
-          <Select value={visibilityFilter} onChange={(event) => setVisibilityFilter(event.target.value as Visibility | "All")}>
-            <option>All visibility</option>
-            <option value="private">Private</option>
-            <option value="shared">Shared</option>
-            <option value="public">Public</option>
-          </Select>
-          <Select value={sort} onChange={(event) => setSort(event.target.value)}>
-            <option value="newest">Newest</option>
-            <option value="want">Want rating</option>
-            <option value="price">Price</option>
-          </Select>
+        <div className="grid gap-2 rounded-[1.5rem] border border-ink/10 bg-white/80 p-2.5 shadow-sm sm:grid-cols-[1fr_1fr_auto]">
+          <label className="grid gap-1 text-xs font-black uppercase tracking-[0.08em] text-ink/45">
+            Occasion
+            <Select value={eventFilter} onChange={(event) => setEventFilter(event.target.value)}>
+              <option>All events</option>
+              {eventTags.map((tag) => <option key={tag}>{tag}</option>)}
+            </Select>
+          </label>
+          <label className="grid gap-1 text-xs font-black uppercase tracking-[0.08em] text-ink/45">
+            Sharing
+            <Select value={visibilityFilter} onChange={(event) => setVisibilityFilter(event.target.value as Visibility | "All")}>
+              <option>All visibility</option>
+              <option value="private">Private</option>
+              <option value="shared">Shared</option>
+              <option value="public">Public</option>
+            </Select>
+          </label>
+          <label className="grid gap-1 text-xs font-black uppercase tracking-[0.08em] text-ink/45">
+            Sort
+            <Select value={sort} onChange={(event) => setSort(event.target.value)}>
+              <option value="newest">Newest</option>
+              <option value="want">Most wanted</option>
+              <option value="price">Price</option>
+            </Select>
+          </label>
         </div>
 
         {showForm || editing ? (
@@ -253,7 +278,7 @@ export function WishlistDetailClient({ slug }: { slug: string }) {
         ) : null}
 
         {visibleGifts.length ? (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {visibleGifts.map((gift) => (
               <GiftCard
                 key={gift.id}
@@ -267,7 +292,8 @@ export function WishlistDetailClient({ slug }: { slug: string }) {
           </div>
         ) : (
           <div className="rounded-[2rem] border border-dashed border-ink/20 bg-white p-8 text-center">
-            <h3 className="text-xl font-black">No gifts match this view.</h3>
+            <Sparkles className="mx-auto text-berry" size={24} />
+            <h3 className="mt-3 text-xl font-black">No gifts match this view.</h3>
             <p className="mt-2 font-semibold text-ink/60">Add an idea or loosen the filters.</p>
           </div>
         )}
