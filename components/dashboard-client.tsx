@@ -444,9 +444,9 @@ export function DashboardClient() {
           <p className="text-sm font-black uppercase text-berry">My Gift Groups</p>
           <h2 className="text-2xl font-black">Plan gifts with your people</h2>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {giftGroups.map((group) => (
-            <article className="grid gap-3 rounded-[1.5rem] border border-ink/10 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft" key={group.title}>
+            <article className="grid min-w-0 gap-3 rounded-[1.5rem] border border-ink/10 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft" key={group.title}>
               <div className="grid aspect-[4/3] grid-cols-2 gap-1 overflow-hidden rounded-2xl bg-cloud">
                 {[0, 1, 2, 3].map((index) => (
                   <div className={`grid place-items-center ${index === 0 ? group.tone : "bg-blush text-berry"}`} key={index}>
@@ -469,7 +469,7 @@ export function DashboardClient() {
           ))}
           <button
             type="button"
-            className="focus-ring grid gap-3 rounded-[1.5rem] border border-dashed border-ink/20 bg-white p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft"
+            className="focus-ring grid min-w-0 gap-3 rounded-[1.5rem] border border-dashed border-ink/20 bg-white p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft"
             onClick={() => openShareModal("new")}
           >
             <div className="grid aspect-[4/3] place-items-center rounded-2xl bg-cloud text-berry">

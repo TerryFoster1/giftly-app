@@ -1,9 +1,13 @@
 import { withUser } from "@/lib/api";
-import { deleteProfile, updatePrimaryProfileVanitySlug, updateProfileEvents } from "@/lib/db";
+import { deleteProfile, updateMyProfile, updatePrimaryProfileVanitySlug, updateProfileEvents } from "@/lib/db";
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   return withUser(async (user) => {
     const body = await request.json();
+    if (body.mode === "my-profile") {
+      return updateMyProfile(user, params.id, body);
+    }
+
     if (typeof body.slug === "string") {
       try {
         return await updatePrimaryProfileVanitySlug(user, params.id, body.slug);

@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { Gift, Home, LogOut, UserRound } from "lucide-react";
+import { Gift, Home, UserRound } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { Brand } from "./brand";
+import { AccountMenu } from "./account-menu";
 
 export async function AppShell({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
@@ -19,10 +20,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
               My Bubble
             </Link>
             {user ? (
-              <Link className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold hover:bg-white" href="/logout" prefetch={false}>
-                <LogOut size={16} />
-                Logout
-              </Link>
+              <AccountMenu user={user} />
             ) : (
               <Link className="rounded-full bg-white px-4 py-2 text-sm font-bold hover:bg-blush" href="/login">
                 Login

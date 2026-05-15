@@ -733,6 +733,80 @@ export async function shareWishlist(user: User, input: { profileId: string; conn
   return toWishlistShare({ ...share, exclusions: [] });
 }
 
+export async function deleteConnection(user: User, connectionId: string) {
+  const connection = await prisma.connection.findFirst({
+    where: { id: connectionId, requesterUserId: user.id }
+  });
+  if (!connection) throw new Error("FORBIDDEN");
+
+  await prisma.$transaction([
+    prisma.giftGroupMember.deleteMany({ where: { connectionId } }),
+    prisma.connection.delete({ where: { id: connectionId } })
+  ]);
+}
+
+export async function deleteGiftGroup(user: User, groupId: string) {
+  const group = await prisma.giftGroup.findFirst({ where: { id: groupId, ownerUserId: user.id } });
+  if (!group) throw new Error("FORBIDDEN");
+  await prisma.giftGroup.delete({ where: { id: groupId } });
+}
+
+export async function removeConnectionFromGroup(user: User, groupId: string, memberId: string) {
+  const member = await prisma.giftGroupMember.findFirst({
+    where: {
+      id: memberId,
+      groupId,
+      group: { ownerUserId: user.id }
+    }
+  });
+  if (!member) throw new Error("FORBIDDEN");
+  await prisma.giftGroupMember.delete({ where: { id: memberId } });
+}
+
+export async function updateMyProfile(
+  user: User,
+  profileId: string,
+  input: { name?: string; birthday?: string; anniversary?: string; photoUrl?: string; slug?: string }
+) {
+  const profile = await prisma.profile.findFirst({
+    where: {
+      id: profileId,
+      ownerUserId: user.id,
+      linkedUserId: user.id,
+      isPrimary: true,
+      isManagedProfile: false
+    }
+  });
+  if (!profile) throw new Error("FORBIDDEN");
+
+  const nextSlug = typeof input.slug === "string" && input.slug.trim() ? assertSafeSlug(input.slug) : profile.slug;
+  if (nextSlug !== profile.slug) {
+    const existing = await prisma.profile.findUnique({ where: { slug: nextSlug } });
+    if (existing && existing.id !== profileId) throw new Error("SLUG_TAKEN");
+  }
+
+  const name = input.name?.trim() || profile.displayName;
+  const updated = await prisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: user.id },
+      data: { name }
+    });
+    return tx.profile.update({
+      where: { id: profileId },
+      data: {
+        displayName: name,
+        slug: nextSlug,
+        photoUrl: input.photoUrl?.trim() || null,
+        birthday: input.birthday ? new Date(input.birthday) : null,
+        anniversary: input.anniversary ? new Date(input.anniversary) : null,
+        primaryEventType: input.birthday ? "BIRTHDAY" : null
+      }
+    });
+  });
+
+  return toProfile(updated);
+}
+
 export async function acceptBubbleInvite(
   user: User,
   input: { ownerUserId: string; groupId?: string; wishlistId?: string }

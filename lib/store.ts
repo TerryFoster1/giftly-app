@@ -154,6 +154,55 @@ export function useGiftlyStore() {
           return member;
         });
       },
+      async removeGroupMember(groupId: string, memberId: string) {
+        return runAction(async () => {
+          await requestJson<{ ok: boolean }>(`/api/groups/${groupId}/members?memberId=${encodeURIComponent(memberId)}`, { method: "DELETE" });
+          setStore((current) => ({
+            ...current,
+            groups: (current.groups ?? []).map((group) =>
+              group.id === groupId ? { ...group, members: group.members.filter((member) => member.id !== memberId) } : group
+            )
+          }));
+        });
+      },
+      async deleteGroup(groupId: string) {
+        return runAction(async () => {
+          await requestJson<{ ok: boolean }>(`/api/groups/${groupId}`, { method: "DELETE" });
+          setStore((current) => ({
+            ...current,
+            groups: (current.groups ?? []).filter((group) => group.id !== groupId),
+            wishlistShares: (current.wishlistShares ?? []).filter((share) => share.groupId !== groupId)
+          }));
+        });
+      },
+      async deleteConnection(connectionId: string) {
+        return runAction(async () => {
+          await requestJson<{ ok: boolean }>(`/api/connections/${connectionId}`, { method: "DELETE" });
+          setStore((current) => ({
+            ...current,
+            connections: (current.connections ?? []).filter((connection) => connection.id !== connectionId),
+            groups: (current.groups ?? []).map((group) => ({
+              ...group,
+              members: group.members.filter((member) => member.connectionId !== connectionId)
+            })),
+            wishlistShares: (current.wishlistShares ?? []).filter((share) => share.connectionId !== connectionId)
+          }));
+        });
+      },
+      async updateMyProfile(profileId: string, input: { name?: string; birthday?: string; anniversary?: string; photoUrl?: string; slug?: string }) {
+        return runAction(async () => {
+          const updated = await requestJson<Profile>(`/api/profiles/${profileId}`, {
+            method: "PATCH",
+            body: JSON.stringify({ ...input, mode: "my-profile" })
+          });
+          setStore((current) => ({
+            ...current,
+            user: current.user ? { ...current.user, name: updated.displayName } : current.user,
+            profiles: current.profiles.map((profile) => (profile.id === updated.id ? updated : profile))
+          }));
+          return updated;
+        });
+      },
       async shareWishlist(input: { profileId: string; connectionId?: string; groupId?: string; excludedConnectionIds?: string[] }) {
         return runAction(async () => {
           const share = await requestJson<WishlistShare>("/api/wishlist-shares", {
