@@ -52,7 +52,7 @@ export default async function GiftDetailPage({ params }: { params: { id: string 
 
             <p className="text-sm font-semibold leading-6 text-ink/65">{description}</p>
 
-            <GiftDetailActions gift={gift} buyUrl={buyUrl} viewerRole={viewerRole} currentUserId={user.id} />
+            <GiftDetailActions gift={gift} buyUrl={buyUrl} viewerRole={viewerRole} currentUserId={user.id} profileSlug={profile.slug} />
           </aside>
         </section>
 

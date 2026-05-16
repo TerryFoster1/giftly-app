@@ -183,6 +183,10 @@ export function DashboardClient() {
       if (!targetProfile) throw new Error("Choose a wishlist first.");
 
       const metadata = await fetchMetadata(normalized.url);
+      if (!metadata.title) {
+        setFastError("Couldn't fetch details, add manually from the wishlist page.");
+        return;
+      }
       const stamp = new Date().toISOString();
       const productUrl = metadata.canonicalUrl || normalized.url;
       const price = priceAmount(metadata.price);
@@ -190,7 +194,7 @@ export function DashboardClient() {
         id: `gift_${crypto.randomUUID()}`,
         profileId: targetProfile.id,
         createdByUserId: user?.id ?? "current_user",
-        title: metadata.title || "Gift idea",
+        title: metadata.title,
         productUrl,
         originalUrl: normalized.url,
         affiliateUrl: undefined,

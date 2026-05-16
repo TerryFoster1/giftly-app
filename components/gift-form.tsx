@@ -67,6 +67,7 @@ export function GiftForm({ profileId, gift, onSave, onCancel }: GiftFormProps) {
         body: JSON.stringify({ url: normalized.url })
       });
       const metadata = await response.json();
+      const metadataError = metadata.error && !metadata.title;
       setForm((current) => ({
         ...current,
         title: metadata.title || current.title,
@@ -77,9 +78,9 @@ export function GiftForm({ profileId, gift, onSave, onCancel }: GiftFormProps) {
         currency: metadata.currency ?? current.currency,
         priceSourceUrl: metadata.canonicalUrl || current.priceSourceUrl
       }));
-      setMetadataMessage(metadata.error || "Gift details filled in. You can edit anything before saving.");
+      setMetadataMessage(metadataError ? "Couldn't fetch details, add manually." : metadata.error || "Gift details filled in. You can edit anything before saving.");
     } catch {
-      setMetadataMessage("We couldn't pull details from this site. You can still add it manually.");
+      setMetadataMessage("Couldn't fetch details, add manually.");
     } finally {
       setFetchingMetadata(false);
     }
@@ -114,6 +115,11 @@ export function GiftForm({ profileId, gift, onSave, onCancel }: GiftFormProps) {
       setUrlError(normalized.error ?? "Please paste the full product link, starting with https://");
       return;
     }
+    if (!form.title.trim()) {
+      setSaveError("Add a product name before saving.");
+      setMetadataMessage("Couldn't fetch details, add manually.");
+      return;
+    }
     const stamp = new Date().toISOString();
     const productUrl = normalized.url;
     setSaving(true);
@@ -122,7 +128,7 @@ export function GiftForm({ profileId, gift, onSave, onCancel }: GiftFormProps) {
         id: gift?.id ?? `gift_${crypto.randomUUID()}`,
         profileId,
         createdByUserId: gift?.createdByUserId ?? "current_user",
-        title: form.title || "Untitled gift",
+        title: form.title.trim(),
         productUrl,
         originalUrl: gift?.originalUrl ?? productUrl,
         affiliateUrl: gift?.affiliateUrl,

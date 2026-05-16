@@ -1,54 +1,33 @@
 "use client";
 
 import Link from "next/link";
-import { Plus, Share2, Sparkles, X } from "lucide-react";
+import { Copy, Plus, Share2, Sparkles, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useGiftlyStore } from "@/lib/store";
-import { eventTags, type GiftItem, type Visibility } from "@/lib/types";
-import { normalizeProductUrl } from "@/lib/product-url";
+import { eventTags, type Connection, type GiftItem, type Visibility } from "@/lib/types";
 import { publicProfilePath } from "@/lib/url";
 import { GiftCard } from "./gift-card";
 import { GiftForm } from "./gift-form";
 import { Button, Field, Input, Select } from "./ui";
 
-const fallbackImage = "https://images.unsplash.com/photo-1513201099705-a9746e1e201f?q=80&w=600&auto=format&fit=crop";
-
-type MetadataResult = {
-  title?: string;
-  imageUrl?: string;
-  storeName?: string;
-  siteName?: string;
-  price?: string | number;
-  currency?: string;
-  canonicalUrl?: string;
-};
-
-function priceAmount(value: unknown) {
-  const parsed = Number(value || 0);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function storeFromUrl(url: string) {
-  try {
-    return new URL(url).hostname.replace(/^www\./, "");
-  } catch {
-    return "Saved link";
-  }
+function connectionLabel(connection: Connection) {
+  return connection.displayName || connection.realName || connection.emailOrPhone || "Connected person";
 }
 
 export function WishlistDetailClient({ slug }: { slug: string }) {
-  const { user, profiles, gifts, ready, actionError, actions } = useGiftlyStore();
+  const { user, profiles, gifts, connections = [], groups = [], wishlistShares = [], ready, actionError, actions } = useGiftlyStore();
   const [eventFilter, setEventFilter] = useState("All");
   const [visibilityFilter, setVisibilityFilter] = useState<Visibility | "All">("All");
   const [sort, setSort] = useState("newest");
   const [editing, setEditing] = useState<GiftItem | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [giftMessage, setGiftMessage] = useState("");
-  const [fastUrl, setFastUrl] = useState("");
-  const [fastError, setFastError] = useState("");
-  const [fastModalOpen, setFastModalOpen] = useState(false);
-  const [fastSaving, setFastSaving] = useState(false);
-  const [fastVisibility, setFastVisibility] = useState<"private" | "shared">("private");
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareTargetType, setShareTargetType] = useState<"person" | "group" | "invite">("person");
+  const [shareConnectionId, setShareConnectionId] = useState("");
+  const [shareGroupId, setShareGroupId] = useState("");
+  const [inviteValue, setInviteValue] = useState("");
+  const [shareMessage, setShareMessage] = useState("");
 
   const selectedProfile = useMemo(() => profiles.find((profile) => profile.slug === slug), [profiles, slug]);
   const wishlistStats = useMemo(() => {
@@ -82,88 +61,43 @@ export function WishlistDetailClient({ slug }: { slug: string }) {
     setEditing(null);
   }
 
-  function openFastAdd() {
-    setFastError("");
-    const normalized = normalizeProductUrl(fastUrl);
-    if (normalized.error || !normalized.url) {
-      setFastError(normalized.error ?? "Please paste the full product link, starting with https://");
-      return;
-    }
-    setFastUrl(normalized.url);
-    setFastModalOpen(true);
-  }
-
-  async function fetchMetadata(url: string): Promise<MetadataResult> {
+  async function saveShare() {
+    if (!selectedProfile) return;
+    setShareMessage("");
     try {
-      const response = await fetch("/api/metadata", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ url })
-      });
-      return (await response.json()) as MetadataResult;
-    } catch {
-      return {};
-    }
-  }
-
-  async function saveFastGift() {
-    setFastError("");
-    const normalized = normalizeProductUrl(fastUrl);
-    if (normalized.error || !normalized.url) {
-      setFastError(normalized.error ?? "Please paste the full product link, starting with https://");
-      return;
-    }
-    if (!selectedProfile) {
-      setFastError("Choose a wishlist first.");
-      return;
-    }
-
-    setFastSaving(true);
-    try {
-      const metadata = await fetchMetadata(normalized.url);
-      const stamp = new Date().toISOString();
-      const productUrl = metadata.canonicalUrl || normalized.url;
-      const price = priceAmount(metadata.price);
-      const savedGift: GiftItem = {
-        id: `gift_${crypto.randomUUID()}`,
-        profileId: selectedProfile.id,
-        createdByUserId: user?.id ?? "current_user",
-        title: metadata.title || "Gift idea",
-        productUrl,
-        originalUrl: normalized.url,
-        affiliateUrl: undefined,
-        monetizedUrl: productUrl,
-        affiliateStatus: "not_checked",
-        storeName: metadata.storeName || metadata.siteName || storeFromUrl(productUrl),
-        imageUrl: metadata.imageUrl || fallbackImage,
-        price,
-        originalPrice: price,
-        currentPrice: price,
-        estimatedTotalCost: price,
-        currency: (metadata.currency || "").trim().toUpperCase(),
-        notes: "",
-        eventTag: "General Wishlist",
-        wantRating: 3,
-        visibility: fastVisibility,
-        hiddenFromRecipient: false,
-        allowContributions: false,
-        fundingGoalAmount: 0,
-        currentContributionAmount: 0,
-        reservedStatus: "available",
-        purchasedStatus: false,
-        createdAt: stamp,
-        updatedAt: stamp
-      };
-      await actions.saveGift(savedGift);
+      if (shareTargetType === "person") {
+        if (!shareConnectionId) {
+          setShareMessage("Choose someone from your Bubble.");
+          return;
+        }
+        await actions.shareWishlist({ profileId: selectedProfile.id, connectionId: shareConnectionId });
+      } else if (shareTargetType === "group") {
+        if (!shareGroupId) {
+          setShareMessage("Choose a group.");
+          return;
+        }
+        await actions.shareWishlist({ profileId: selectedProfile.id, groupId: shareGroupId });
+      } else {
+        if (!inviteValue.trim()) {
+          setShareMessage("Add an email or phone number.");
+          return;
+        }
+        const created = await actions.createConnection({ emailOrPhone: inviteValue.trim(), displayName: inviteValue.trim(), source: "EMAIL" });
+        await actions.shareWishlist({ profileId: selectedProfile.id, connectionId: created.id });
+        setInviteValue("");
+      }
       await actions.refresh();
-      setFastModalOpen(false);
-      setFastUrl("");
-      setGiftMessage("Gift saved.");
+      setShareMessage("Wishlist shared.");
     } catch (error) {
-      setFastError(error instanceof Error ? error.message : "Gift could not be saved.");
-    } finally {
-      setFastSaving(false);
+      setShareMessage(error instanceof Error ? error.message : "Wishlist could not be shared.");
     }
+  }
+
+  async function copyShareLink() {
+    if (!selectedProfile) return;
+    const link = `${window.location.origin}${publicProfilePath(selectedProfile.slug)}`;
+    await navigator.clipboard?.writeText(link);
+    setShareMessage("Share link copied.");
   }
 
   async function toggleReserved(gift: GiftItem) {
@@ -222,20 +156,16 @@ export function WishlistDetailClient({ slug }: { slug: string }) {
               <Share2 size={15} />
               Public view
             </Link>
+            <Button type="button" variant="secondary" className="min-h-10" onClick={() => setShareOpen(true)}>
+              <Share2 size={15} />
+              Share
+            </Button>
             <Button type="button" className="min-h-10" onClick={() => { setEditing(null); setShowForm(true); }}>
               <Plus size={16} />
-              Add gift
+              Add Gift
             </Button>
           </div>
         </div>
-        <div className="grid gap-3 rounded-[1.5rem] bg-cloud p-2.5 sm:grid-cols-[1fr_auto]">
-          <Input aria-label="Product link" placeholder="Paste a product link" type="text" value={fastUrl} onChange={(event) => setFastUrl(event.target.value)} />
-          <Button type="button" className="min-h-10" onClick={openFastAdd}>
-            <Plus size={16} />
-            Quick add
-          </Button>
-        </div>
-        {fastError ? <p className="rounded-2xl bg-blush p-3 text-sm font-bold text-berry">{fastError}</p> : null}
       </section>
 
       {giftMessage ? <p className="rounded-2xl bg-mint p-3 text-sm font-bold text-spruce">{giftMessage}</p> : null}
@@ -300,29 +230,61 @@ export function WishlistDetailClient({ slug }: { slug: string }) {
         )}
       </section>
 
-      {fastModalOpen ? (
+      {shareOpen ? (
         <div className="fixed inset-0 z-40 grid place-items-end bg-ink/40 p-0 sm:place-items-center sm:p-4">
           <div className="max-h-[92vh] w-full max-w-lg overflow-auto rounded-t-[2rem] bg-white p-4 shadow-soft sm:rounded-[2rem]">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-xl font-black">Add to wishlist</h2>
-              <Button type="button" variant="ghost" onClick={() => setFastModalOpen(false)} aria-label="Close">
+              <div>
+                <p className="text-xs font-black uppercase text-berry">Share wishlist</p>
+                <h2 className="text-xl font-black">{selectedProfile.displayName}</h2>
+              </div>
+              <Button type="button" variant="ghost" onClick={() => setShareOpen(false)} aria-label="Close">
                 <X size={16} />
               </Button>
             </div>
             <div className="mt-4 grid gap-3">
-              <Field label="List privacy">
-                <Select value={fastVisibility} onChange={(event) => setFastVisibility(event.target.value as "private" | "shared")}>
-                  <option value="private">Private</option>
-                  <option value="shared">Shared</option>
-                </Select>
-              </Field>
-              <p className="rounded-2xl bg-cloud p-3 text-xs font-bold leading-5 text-ink/60">
-                Future: shared lists can be limited to groups like Family or Close Friends, with product-level exclusions.
-              </p>
-              {fastError ? <p className="rounded-2xl bg-blush p-3 text-sm font-bold text-berry">{fastError}</p> : null}
-              <Button type="button" onClick={saveFastGift} disabled={fastSaving}>
-                {fastSaving ? "Saving..." : "Save gift"}
-              </Button>
+              <div className="grid gap-2 sm:grid-cols-3">
+                <button type="button" className={`rounded-2xl p-3 text-sm font-black ${shareTargetType === "person" ? "bg-mint text-spruce" : "bg-cloud text-ink/60"}`} onClick={() => setShareTargetType("person")}>Person</button>
+                <button type="button" className={`rounded-2xl p-3 text-sm font-black ${shareTargetType === "group" ? "bg-mint text-spruce" : "bg-cloud text-ink/60"}`} onClick={() => setShareTargetType("group")}>Group</button>
+                <button type="button" className={`rounded-2xl p-3 text-sm font-black ${shareTargetType === "invite" ? "bg-mint text-spruce" : "bg-cloud text-ink/60"}`} onClick={() => setShareTargetType("invite")}>Invite</button>
+              </div>
+              {shareTargetType === "person" ? (
+                <Field label="Share with person">
+                  <Select value={shareConnectionId} onChange={(event) => setShareConnectionId(event.target.value)}>
+                    <option value="">Choose someone</option>
+                    {connections.map((connection) => <option key={connection.id} value={connection.id}>{connectionLabel(connection)}</option>)}
+                  </Select>
+                </Field>
+              ) : null}
+              {shareTargetType === "group" ? (
+                <Field label="Share with group">
+                  <Select value={shareGroupId} onChange={(event) => setShareGroupId(event.target.value)}>
+                    <option value="">Choose a group</option>
+                    {groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
+                  </Select>
+                </Field>
+              ) : null}
+              {shareTargetType === "invite" ? (
+                <Field label="Invite by email or phone">
+                  <Input value={inviteValue} onChange={(event) => setInviteValue(event.target.value)} placeholder="name@example.com or mobile" />
+                </Field>
+              ) : null}
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Button type="button" onClick={saveShare}>
+                  <Share2 size={16} />
+                  Share wishlist
+                </Button>
+                <Button type="button" variant="ghost" onClick={copyShareLink}>
+                  <Copy size={16} />
+                  Copy public link
+                </Button>
+              </div>
+              {wishlistShares.filter((share) => share.profileId === selectedProfile.id).length ? (
+                <p className="rounded-2xl bg-cloud p-3 text-xs font-bold text-ink/55">
+                  {wishlistShares.filter((share) => share.profileId === selectedProfile.id).length} active share grant.
+                </p>
+              ) : null}
+              {shareMessage ? <p className="rounded-2xl bg-mint p-3 text-sm font-bold text-spruce">{shareMessage}</p> : null}
             </div>
           </div>
         </div>

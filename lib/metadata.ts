@@ -96,6 +96,28 @@ function getTitle(html: string) {
   return decodeHtml(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]);
 }
 
+function getFirstHeading(html: string) {
+  return decodeHtml(html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i)?.[1]?.replace(/<[^>]+>/g, " "));
+}
+
+function getJsonLdName(html: string) {
+  const scripts = html.match(/<script\b[^>]*type=["']application\/ld\+json["'][^>]*>[\s\S]*?<\/script>/gi) ?? [];
+  for (const script of scripts) {
+    const raw = script.replace(/^<script\b[^>]*>/i, "").replace(/<\/script>$/i, "").trim();
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        const named = parsed.find((item) => item && typeof item === "object" && typeof item.name === "string");
+        if (named) return decodeHtml(named.name);
+      }
+      if (parsed && typeof parsed === "object" && typeof parsed.name === "string") return decodeHtml(parsed.name);
+    } catch {
+      continue;
+    }
+  }
+  return undefined;
+}
+
 function getCanonical(html: string, baseUrl: string) {
   const links = html.match(/<link\b[^>]*>/gi) ?? [];
   for (const link of links) {
@@ -245,7 +267,7 @@ export async function extractUrlMetadata(inputUrl: string): Promise<UrlMetadata>
     const domainCurrency = finalParsedUrl.hostname.toLowerCase().endsWith("amazon.ca") && price ? "CAD" : undefined;
 
     return {
-      title: schema.title || getMeta(html, "og:title") || getMeta(html, "twitter:title") || getTitle(html),
+      title: schema.title || getMeta(html, "og:title") || getMeta(html, "twitter:title") || getJsonLdName(html) || getTitle(html) || getFirstHeading(html),
       description: getMeta(html, "og:description") || getMeta(html, "twitter:description") || getMeta(html, "description"),
       imageUrl: absolutizeUrl(schema.imageUrl || getMeta(html, "og:image") || getMeta(html, "twitter:image"), finalUrl),
       siteName,
