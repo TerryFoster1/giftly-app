@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "test:gift-save": "node scripts/gift-save-regression.mjs",
+    "test:secret-santa": "node scripts/secret-santa-draw.test.mjs",
     "db:generate": "prisma generate",
     "db:generate:prod": "prisma generate --schema prisma-postgres/schema.prisma",
     "db:migrate": "prisma migrate dev",

@@ -95,6 +95,21 @@ export async function withUser<T>(
     if (error instanceof Error && error.message === "GIFT_UNAVAILABLE") {
       return json({ message: "This gift is already reserved or purchased." }, 409);
     }
+    if (error instanceof Error && error.message === "SECRET_SANTA_MIN_PARTICIPANTS") {
+      return json({ message: "At least 3 accepted participants are needed before running the draw." }, 400);
+    }
+    if (error instanceof Error && error.message === "SECRET_SANTA_DRAW_IMPOSSIBLE") {
+      return json({ message: "Those exclusions make the draw impossible. Adjust participants or exclusions and try again." }, 400);
+    }
+    if (error instanceof Error && error.message === "SECRET_SANTA_DRAW_LOCKED") {
+      return json({ message: "The draw is already locked. Reset it before changing this event." }, 400);
+    }
+    if (error instanceof Error && error.message === "SECRET_SANTA_ASSIGNMENT_NOT_READY") {
+      return json({ message: "Assignments are not ready yet." }, 404);
+    }
+    if (error instanceof Error && error.message.startsWith("SECRET_SANTA_")) {
+      return json({ message: "This gift exchange action could not be completed." }, 400);
+    }
     if (error instanceof Error && error.message === "AUTH_SECRET_REQUIRED") {
       return json({ message: "Server auth secret is not configured." }, 500);
     }

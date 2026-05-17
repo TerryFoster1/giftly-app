@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Gift, Home, UserRound } from "lucide-react";
+import { Gift, Home, Shuffle, UserRound } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { Brand } from "./brand";
 import { AccountMenu } from "./account-menu";
@@ -19,6 +19,9 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
             <Link className="rounded-full px-4 py-2 text-sm font-bold hover:bg-white" href="/profiles">
               My Bubble
             </Link>
+            <Link className="rounded-full px-4 py-2 text-sm font-bold hover:bg-white" href="/secret-santa">
+              Gift Exchange
+            </Link>
             {user ? (
               <AccountMenu user={user} />
             ) : (
@@ -31,7 +34,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
       </header>
       {children}
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-ink/10 bg-white/95 px-4 py-2 shadow-soft md:hidden">
-        <div className="mx-auto grid max-w-sm grid-cols-3 gap-2">
+        <div className="mx-auto grid max-w-sm grid-cols-4 gap-2">
           <Link className="grid place-items-center gap-1 rounded-2xl p-2 text-xs font-bold" href="/">
             <Home size={20} />
             Home
@@ -39,6 +42,10 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
           <Link className="grid place-items-center gap-1 rounded-2xl bg-coral text-white p-2 text-xs font-bold" href="/dashboard">
             <Gift size={20} />
             Gifts
+          </Link>
+          <Link className="grid place-items-center gap-1 rounded-2xl p-2 text-xs font-bold" href="/secret-santa">
+            <Shuffle size={20} />
+            Swap
           </Link>
           <Link className="grid place-items-center gap-1 rounded-2xl p-2 text-xs font-bold" href="/profiles">
             <UserRound size={20} />

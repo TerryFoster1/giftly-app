@@ -25,6 +25,8 @@ model User {
   ownedGroups GiftGroup[] @relation("GiftGroupOwner")
   groupMemberships GiftGroupMember[] @relation("GiftGroupMemberUser")
   wishlistShares WishlistShare[] @relation("WishlistShareOwner")
+  organizedSecretSantaEvents SecretSantaEvent[] @relation("SecretSantaOrganizer")
+  secretSantaParticipants SecretSantaParticipant[] @relation("SecretSantaParticipantUser")
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 }
@@ -62,6 +64,7 @@ model Profile {
   events      GiftEvent[]
   wishlistShares WishlistShare[]
   managedConnections Connection[] @relation("ManagedProfileConnection")
+  secretSantaParticipants SecretSantaParticipant[] @relation("SecretSantaParticipantProfile")
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
@@ -223,6 +226,7 @@ model GiftItem {
   purchasedByUserId          String?
   reservations               Reservation[]
   contributionPlaceholders   ContributionPlaceholder[]
+  secretSantaGiftActions     SecretSantaGiftAction[]
   createdAt                  DateTime                    @default(now())
   updatedAt                  DateTime                    @updatedAt
 
@@ -302,6 +306,107 @@ model AffiliateProgram {
   @@index([active])
 }
 
+model SecretSantaEvent {
+  id             String              @id
+  organizerUserId String
+  organizer      User                @relation("SecretSantaOrganizer", fields: [organizerUserId], references: [id], onDelete: Cascade)
+  title          String
+  occasionDate   DateTime?
+  spendingLimit  Float?
+  rulesMessage   String
+  shippingNotes  String
+  status         SecretSantaEventStatus @default(draft)
+  inviteToken    String              @unique
+  participants   SecretSantaParticipant[]
+  assignments    SecretSantaAssignment[]
+  exclusions     SecretSantaExclusion[]
+  giftActions    SecretSantaGiftAction[]
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@index([organizerUserId])
+  @@index([status])
+}
+
+model SecretSantaParticipant {
+  id             String              @id
+  eventId        String
+  event          SecretSantaEvent     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId         String?
+  user           User?               @relation("SecretSantaParticipantUser", fields: [userId], references: [id], onDelete: SetNull)
+  profileId      String?
+  profile        Profile?            @relation("SecretSantaParticipantProfile", fields: [profileId], references: [id], onDelete: SetNull)
+  invitedEmail   String?
+  displayName    String
+  joinStatus     SecretSantaJoinStatus @default(invited)
+  inviteToken    String              @unique
+  giverAssignment SecretSantaAssignment? @relation("SecretSantaAssignmentGiver")
+  recipientAssignment SecretSantaAssignment? @relation("SecretSantaAssignmentRecipient")
+  exclusionsA    SecretSantaExclusion[] @relation("SecretSantaExclusionA")
+  exclusionsB    SecretSantaExclusion[] @relation("SecretSantaExclusionB")
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@index([eventId])
+  @@index([userId])
+  @@index([profileId])
+  @@index([invitedEmail])
+  @@unique([eventId, userId])
+  @@unique([eventId, invitedEmail])
+}
+
+model SecretSantaAssignment {
+  id                    String                  @id
+  eventId               String
+  event                 SecretSantaEvent         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  giverParticipantId    String                  @unique
+  giverParticipant      SecretSantaParticipant   @relation("SecretSantaAssignmentGiver", fields: [giverParticipantId], references: [id], onDelete: Cascade)
+  recipientParticipantId String                 @unique
+  recipientParticipant  SecretSantaParticipant   @relation("SecretSantaAssignmentRecipient", fields: [recipientParticipantId], references: [id], onDelete: Cascade)
+  privateNote           String
+  giftActions           SecretSantaGiftAction[]
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+
+  @@index([eventId])
+  @@index([recipientParticipantId])
+}
+
+model SecretSantaExclusion {
+  id             String                  @id
+  eventId        String
+  event          SecretSantaEvent         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  participantAId String
+  participantA   SecretSantaParticipant   @relation("SecretSantaExclusionA", fields: [participantAId], references: [id], onDelete: Cascade)
+  participantBId String
+  participantB   SecretSantaParticipant   @relation("SecretSantaExclusionB", fields: [participantBId], references: [id], onDelete: Cascade)
+  createdAt      DateTime                @default(now())
+
+  @@index([eventId])
+  @@index([participantAId])
+  @@index([participantBId])
+  @@unique([eventId, participantAId, participantBId])
+}
+
+model SecretSantaGiftAction {
+  id            String                  @id
+  eventId       String
+  event         SecretSantaEvent         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  assignmentId  String
+  assignment    SecretSantaAssignment    @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  giftItemId    String
+  giftItem      GiftItem                 @relation(fields: [giftItemId], references: [id], onDelete: Cascade)
+  action        SecretSantaGiftActionType
+  privateNote   String
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+
+  @@index([eventId])
+  @@index([assignmentId])
+  @@index([giftItemId])
+  @@unique([assignmentId, giftItemId])
+}
+
 enum Visibility {
   private
   shared
@@ -371,4 +476,22 @@ enum GiftEventType {
   BABY_SHOWER
   HOLIDAY
   CUSTOM
+}
+
+enum SecretSantaEventStatus {
+  draft
+  open
+  drawn
+  archived
+}
+
+enum SecretSantaJoinStatus {
+  invited
+  accepted
+  declined
+}
+
+enum SecretSantaGiftActionType {
+  reserved
+  purchased
 }

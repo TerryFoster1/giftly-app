@@ -15,6 +15,9 @@ export type ConnectionSource = "QR" | "INVITE_LINK" | "EMAIL" | "MANUAL";
 export type PrimaryEventType = "BIRTHDAY" | "WEDDING" | "BABY" | "GENERAL";
 export type GiftEventType = "BIRTHDAY" | "ANNIVERSARY" | "WEDDING" | "BABY_SHOWER" | "HOLIDAY" | "CUSTOM";
 export type RecommendedAffiliateStatus = "none" | "matched" | "needs_review" | "manual";
+export type SecretSantaEventStatus = "draft" | "open" | "drawn" | "archived";
+export type SecretSantaJoinStatus = "invited" | "accepted" | "declined";
+export type SecretSantaGiftActionType = "reserved" | "purchased";
 
 export type User = {
   id: string;
@@ -142,6 +145,67 @@ export type SharedWishlist = {
   profile: Profile;
   gifts: GiftItem[];
   eventDate?: string;
+};
+
+export type SecretSantaParticipant = {
+  id: string;
+  eventId: string;
+  userId?: string;
+  profileId?: string;
+  invitedEmail?: string;
+  displayName: string;
+  joinStatus: SecretSantaJoinStatus;
+  inviteToken: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SecretSantaAssignment = {
+  id: string;
+  eventId: string;
+  giverParticipantId: string;
+  recipientParticipantId: string;
+  privateNote: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SecretSantaGiftAction = {
+  id: string;
+  eventId: string;
+  assignmentId: string;
+  giftItemId: string;
+  action: SecretSantaGiftActionType;
+  privateNote: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SecretSantaEvent = {
+  id: string;
+  organizerUserId: string;
+  title: string;
+  occasionDate?: string;
+  spendingLimit?: number;
+  rulesMessage: string;
+  shippingNotes: string;
+  status: SecretSantaEventStatus;
+  inviteToken: string;
+  participants: SecretSantaParticipant[];
+  assignments?: SecretSantaAssignment[];
+  giftActions?: SecretSantaGiftAction[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SecretSantaAssignmentDetail = {
+  event: SecretSantaEvent;
+  assignment: SecretSantaAssignment;
+  giver: SecretSantaParticipant;
+  recipient: SecretSantaParticipant;
+  recipientProfile?: Profile;
+  gifts: GiftItem[];
+  giftActions: SecretSantaGiftAction[];
 };
 
 export type Reservation = {
